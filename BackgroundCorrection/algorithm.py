@@ -1,3 +1,5 @@
+from typing import Callable
+
 from scipy.sparse.linalg import spsolve
 from scipy.linalg import cholesky
 from scipy import sparse
@@ -113,6 +115,10 @@ def als(y, lam, ratio, itermax) -> np.ndarray:
         z = spsolve(Z, w * y.astype(np.float64))
         w = ratio * (y > z) + (1 - ratio) * (y < z)
     return z
+
+
+def algorithm_by_index(index: int) -> Callable:
+    return [arpls, als][index]
 
 
 def correct(data: np.ndarray, fkt: callable, **params):

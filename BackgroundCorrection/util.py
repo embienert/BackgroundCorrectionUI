@@ -1,4 +1,6 @@
-import pandas as pd
+from typing import Tuple, Optional
+
+import numpy as np
 
 
 class DDict(dict):
@@ -7,10 +9,34 @@ class DDict(dict):
     __delattr__ = dict.__delitem__
 
 
-def apply_wave_range(df: pd.DataFrame, column_name: str,
-                     wave_min=None, wave_max=None,
-                     selection=None):
+def apply_limits(data: np.ndarray, selection_range: Optional[Tuple[float, float]] = None, selection=None):
     if selection is None:
-        selection = df[column_name] >= wave_min & df[column_name] <= wave_max
+        selection_min, selection_max = selection_range
 
-    return df[column_name].loc[selection], selection
+        selection = (data >= selection_min) & (data <= selection_max)
+
+    return data[selection], selection
+
+
+def normalize_area(x, y):
+    area = np.abs(np.trapz(x=x, y=y))
+
+    return y / area
+
+
+def normalize_sum(y):
+    y_sum = np.abs(np.sum(y))
+
+    return y / y_sum
+
+
+def normalize_max(y):
+    y_max = np.max(y)
+
+    return y / y_max
+
+
+def ground(y):
+    y_min = np.min(y)
+
+    return y - y_min

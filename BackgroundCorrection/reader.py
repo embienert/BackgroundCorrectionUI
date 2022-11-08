@@ -1,47 +1,74 @@
-from typing import List
-
 import pyspectra as spc
 import pandas as pd
 import numpy as np
 
+from typing import List
+import os.path
 
-def read_raman(filename: str, head_rows: int):
+
+class DataFile:
+    def __init__(self, filename: str, content: np.ndarray, head: List[str]):
+        self.filename: str = filename
+
+        self.data: np.ndarray = content
+        self.head: List[str] = head
+
+        self.x = np.copy(self.data[0])
+        self.ys = np.copy(self.data[1:])
+
+        self.x_ranged = np.array([])
+        self.ys_ranged = np.array([])
+        self.range_selection = np.array([])
+
+        self.ys_jar_corrected = np.array([])
+        self.jar_scaling_factors = np.array([])
+
+        self.ys_background_corrected = np.array([])
+        self.ys_background_baseline = np.array([])
+
+        self.ys_normalized = np.array([])
+        self.ys_grounded = np.array([])
+
+        self.x_result = np.array([])
+        self.ys_result = np.array([])
+
+    def write_dat(self, out_dir: str, sep: str):
+        head = self.head if self.head is not None else []
+        data = np.concatenate((self.x_result.reshape(1, -1), self.ys_result))
+
+        # Join all columns to rows
+        output_list = map(lambda y: sep.join(map(lambda x: "%2.7e" % x, y)), data)
+        body = '\n'.join(output_list)
+
+        data_enc = bytes('\n'.join(head) + '\n' + body)
+        with open(os.path.join(out_dir, self.filename), "wb+") as out_stream:
+            out_stream.write(data_enc)
+
+    def extend_head(self, script_version: str, **params):
+        head_extension = [
+            f"BackgroundCorrection.py (Version {script_version})",
+            "".join([f", {param_name} = {param_value}" for param_name, param_value in params.items()])
+        ]
+
+        self.head = [*head_extension, *self.head]
+
+
+def read_raman(filename: str, head_rows: int) -> (np.ndarray, List[str], List[str]):
     with open(filename, 'r') as in_stream:
         file_content = in_stream.read()
 
     lines_raw = file_content.split('\n')
-    lines = np.array(list(map(float,
-                              map(lambda row: row.split(), lines_raw[head_rows:-1]))),
-                     dtype=object)
+    lines = np.vstack(list(map(lambda row: np.array([float(elem) for elem in row]),
+                               map(lambda row: row.split(), lines_raw[head_rows:-1])))).T
     header = lines_raw[:head_rows]
 
-    nr_columns = len(lines[0])
-    try:
-        column_names = list(set(lines_raw[0].split()[1:]))
-
-        if nr_columns != len(column_names):
-            raise IndexError
-    except IndexError:
-        column_names = ['x', *[f"I_{y_index}" for y_index in range(nr_columns-1)]]
-
-    return lines, header, column_names
+    return lines, header
 
 
-def read_chi(filename: str, head_rows: int):
-    with open(filename, 'r') as in_stream:
-        file_content = in_stream.read()
-
-    lines_raw = file_content.split('\n')
-    lines = np.array(list(map(float,
-                              map(lambda row: row.split(), lines_raw[head_rows:-1]))),
-                     dtype=object)
-    header = lines_raw[:head_rows]
-
-    return lines, header, []
-
-
-def read_spc(filename: str):
+def read_spc(filename: str) -> (np.ndarray, List[str], List[str]):
     # This function was taken from the pyspectra library to be modified to this programs needs
+    # TODO: Rewrite to work without DataFrame
+
     out = pd.DataFrame()
 
     f = spc.File(filename)  # Read file
@@ -60,37 +87,27 @@ def read_spc(filename: str):
             out["RamanShift (cm-1)"] = x
             out[str(round(s.subtime))] = y
 
-    return out.to_numpy(dtype=np.float64), [], out.columns
+    return out.to_numpy(dtype=np.float64), []
 
 
-def read(filename: str, head_rows: int):
+def read(filename: str, head_rows: int) -> DataFile:
     file_ext = filename.split('.')[-1]
 
-    if file_ext in ["xy", "dat"]:
-        file_content, header, columns = read_chi(filename, head_rows=head_rows)
-    elif file_ext in ["txt", "raman"]:
-        file_content, header, columns = read_raman(filename, head_rows=head_rows)
+    if file_ext in ["txt", "raman", "xy", "dat"]:
+        file_content, header = read_raman(filename, head_rows=head_rows)
+    # elif file_ext in ["xy", "dat"]:
+    #     file_content, header, columns = read_chi(filename, head_rows=head_rows)
     elif file_ext in ["spc"]:
-        file_content, header, columns = read_spc(filename)
+        file_content, header = read_spc(filename)
     else:
         raise NotImplementedError(f"The filetype {file_ext} is not supported (yet).")
 
-    return file_content, header, columns
+    # TODO: Check file validity
+
+    return DataFile(filename, file_content, header)
 
 
-def read_many(filenames: List[str], head_rows: int):
-    file_contents = []
-    headers = []
-    columns = []
+def read_many(filenames: List[str], head_rows: int) -> List[DataFile]:
+    dataFiles = [read(filename, head_rows) for filename in filenames]
 
-    for filename in filenames:
-        file_content, header, data_columns = read(filename, head_rows)
-
-        file_contents.append(file_content)
-        headers.append(header)
-        columns.append(data_columns)
-
-    return file_contents, headers, columns
-
-
-# TODO: File IO with DataFile class instead of single variables?
+    return dataFiles

@@ -3,36 +3,51 @@ import os.path
 import pandas as pd
 import numpy as np
 
-from BackgroundCorrection.util import apply_wave_range
+from BackgroundCorrection.util import apply_limits
 from BackgroundCorrection.writer import write_dat
-from BackgroundCorrection.reader import read
+from BackgroundCorrection.reader import read, DataFile
 import BackgroundCorrection.algorithm as algorithm
 
 from typing import Tuple
 
 
 def load_jar(filename: str, head_rows: int, jar_selection_range: Tuple[float, float], x_selection):
-    jar_read, _ = read(filename, head_rows)
+    jar_file = read(filename, head_rows)
+    jar_intensity = jar_file.ys[0]
 
-    range_min, range_max = jar_selection_range
+    jar_x_ranged, _ = apply_limits(jar_file.x, selection=x_selection)
+    jar_x_ranged, jar_selection = apply_limits(jar_x_ranged, selection_range=jar_selection_range)
 
-    jar_intensity, _ = apply_wave_range(jar_read, jar_read.columns[1], selection=x_selection)
-    jar_intensity_ranged, jar_selection = apply_wave_range(jar_read, jar_read.columns, wave_min=range_min, wave_max=range_max)
+    jar_y_ranged, _ = apply_limits(jar_intensity, selection=x_selection)
+    jar_intensity_ranged, _ = apply_limits(jar_y_ranged, selection=jar_selection)
+
+    jar_file.x_ranged = jar_x_ranged
+    jar_file.ys_ranged = np.array([jar_intensity_ranged])
+    jar_file.range_selection = jar_selection
+
+    return jar_file
 
 
-    return jar_intensity.to_numpy(), jar_intensity_ranged.to_numpy(), jar_selection
+def jar_correct(jar_file: DataFile, intensity: np.ndarray, **opt):
+    jar_intensity = jar_file.ys[0]
+    jar_selection = jar_file.range_selection
 
-
-def jar_correct(jar_intensity: np.ndarray, jar_intensity_ranged: np.ndarray, jar_selection, intensity: np.ndarray, **opt):
     data_ranged = intensity[jar_selection]
 
-    jar_ranged_corrected, jar_ranged_baseline = algorithm.correct(jar_intensity_ranged, **opt)
+    jar_ranged_corrected = jar_file.ys_background_corrected
+
+    if jar_ranged_corrected.size == 0:
+        jar_ranged_corrected, jar_ranged_baseline = algorithm.correct(jar_file.ys_ranged[0], **opt)
+
+        jar_file.ys_background_corrected = np.array([jar_ranged_corrected])
+        jar_file.ys_background_baseline = np.array([jar_ranged_baseline])
+
     data_ranged_corrected, data_ranged_baseline = algorithm.correct(data_ranged, **opt)
 
-    scaling_factor = np.linalg.lstsq(jar_ranged_corrected.reshape(-1, 1), data_ranged_corrected)
+    scaling_factor, _, _, _ = np.linalg.lstsq(jar_ranged_corrected.reshape(-1, 1), data_ranged_corrected, rcond=None)
     jar_intensity_scaled = scaling_factor * jar_intensity
 
-    return intensity - jar_intensity_scaled
+    return intensity - jar_intensity_scaled, jar_intensity_scaled, scaling_factor
 
 
 def write_jar(orig_filename: str, jar_x, jar_intensity, head, sep):
@@ -47,4 +62,4 @@ def write_jar(orig_filename: str, jar_x, jar_intensity, head, sep):
         os.mkdir(jar_out_dir)
 
     out_data = pd.concat([pd.DataFrame(jar_x), pd.DataFrame(jar_intensity)], axis=1)
-    write_dat(out_data, jar_out_path, head=head, sep=sep, include_head=True)
+    write_dat(out_data, jar_out_path, head=head, sep=sep)
