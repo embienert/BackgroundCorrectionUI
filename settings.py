@@ -5,9 +5,8 @@ from BackgroundCorrection.util import DDict
 
 defaults = {
     "io": {
-        "out_dir": "/out",
+        "out_dir": "out",
         "dat_file_sep": '\t',
-        "include_head": True,
         "head_row_count": 4
     },
     "data": {
@@ -36,7 +35,7 @@ defaults = {
         "range_start": -(2 ** 32 - 1),
         "range_stop": 2 ** 32 - 1,
         "reference_file_head_row_count": 0,
-        "out_dir": "/jar",
+        "out_dir": "jar",
         "plot": {
             "enable": True,
             "jar_original": False,
@@ -56,6 +55,7 @@ defaults = {
         "out_dir": "",
         "plot": {
             "enable": True,
+            "time_step": 1,
             "flip_y": False,
             "heatmap": "hot"
         }
@@ -71,7 +71,7 @@ defaults = {
 
 def write_settings(settings: dict, filename: str = "settings.json"):
     with open(filename, "w+") as out_stream:
-        json.dump(settings, out_stream)
+        json.dump(settings, out_stream, indent=4)
 
 
 def load_settings(filename: str = "settings.json") -> DDict:

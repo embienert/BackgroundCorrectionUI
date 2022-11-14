@@ -1,10 +1,6 @@
-import os.path
-
-import pandas as pd
 import numpy as np
 
 from BackgroundCorrection.util import apply_limits
-from BackgroundCorrection.writer import write_dat
 from BackgroundCorrection.reader import read, DataFile
 import BackgroundCorrection.algorithm as algorithm
 
@@ -48,18 +44,3 @@ def jar_correct(jar_file: DataFile, intensity: np.ndarray, **opt):
     jar_intensity_scaled = scaling_factor * jar_intensity
 
     return intensity - jar_intensity_scaled, jar_intensity_scaled, scaling_factor
-
-
-def write_jar(orig_filename: str, jar_x, jar_intensity, head, sep):
-    out_filename = '.'.join(orig_filename.split('.')[:-1]) + ".dat"
-    out_basename = os.path.basename(out_filename)
-    out_dir = os.path.dirname(out_filename)
-
-    jar_out_dir = os.path.join(out_dir, "out", "jar")
-    jar_out_path = os.path.join(jar_out_dir, out_basename)
-
-    if not os.path.exists(jar_out_dir):
-        os.mkdir(jar_out_dir)
-
-    out_data = pd.concat([pd.DataFrame(jar_x), pd.DataFrame(jar_intensity)], axis=1)
-    write_dat(out_data, jar_out_path, head=head, sep=sep)

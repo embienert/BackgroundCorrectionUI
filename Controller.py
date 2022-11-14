@@ -11,7 +11,8 @@ import os
 import BackgroundCorrection.algorithm as algorithm
 import BackgroundCorrection.reader as reader
 from BackgroundCorrection import jar
-from BackgroundCorrection.units import convert_x
+from BackgroundCorrection.roi_integration import get_area, normalize, export_rois
+from BackgroundCorrection.units import convert_x, unit_x_str
 from BackgroundCorrection.util import apply_limits, normalize_area, normalize_max, ground, normalize_sum
 from settings import load_settings
 
@@ -25,15 +26,45 @@ READFILE_TYPES = [
 
 
 class DataSet:
-    def __init__(self, files: List[reader.DataFile]):
+    def __init__(self, files: List[reader.DataFile], name: str = "dataset"):
         self.files: List[reader.DataFile] = files
+        self.dataset_name: str = name
 
         self.jar_file: Union[reader.DataFile, None] = None
 
         self.x_ranged = None
         self.range_selection = None
 
-        self.result: reader.DataFile
+        self.x_result: np.ndarray = np.array([])
+        self.ys_result: np.ndarray = np.array([])
+        self.ys_jar: np.ndarray = np.array([])
+
+    def export_baseline(self, out_dir, sep):
+        baseline_export_file = reader.DataFile(filename=self.dataset_name + ".dat", content=np.array([]),
+                                               head=self.files[0].head)
+
+        baseline_export_file.x_result = self.x_result
+        baseline_export_file.ys_result = self.ys_result
+
+        if not os.path.exists(out_dir):
+            os.mkdir(out_dir)
+
+        baseline_export_file.write_dat(out_dir, sep)
+
+    def export_jar(self, out_dir, sep):
+        jar_export_file = reader.DataFile(filename=self.dataset_name + "_jar.dat", content=np.array([]), head=[
+            f"Jar-Corrected intensities with reference file {self.jar_file.filename}"])
+
+        jar_export_file.x_result = self.x_result
+        jar_export_file.ys_result = self.ys_jar
+
+        if not os.path.exists(out_dir):
+            os.mkdir(out_dir)
+
+        jar_export_file.write_dat(out_dir, sep)
+
+    def base_dir(self):
+        return os.path.dirname(os.path.abspath(self.files[0].filename))
 
 
 class Controller:
@@ -61,6 +92,9 @@ class Controller:
             files_dir = askdirectory()
             root.destroy()
 
+            if files_dir == "":
+                raise FileNotFoundError("No path provided. Aborting.")
+
             files_subdirs = [subdir.path for subdir in os.scandir(files_dir)
                              if subdir.is_dir() and subdir.name != self.settings.io.out_dir]
             subdir_files = [[file.path for file in os.scandir(subdir) if os.path.isfile(file)]
@@ -76,7 +110,7 @@ class Controller:
 
     def extend_headers(self):
         params = {
-            "alg": algorithm.algorithm_by_index(self.settings.baseline.algorithm).__name__,
+            "algorithm": algorithm.algorithm_by_index(self.settings.baseline.algorithm).__name__,
             "itermax": self.settings.baseline.itermax,
             "lambda": self.settings.baseline.lam,
             "ratio": self.settings.baseline.ratio
@@ -95,10 +129,11 @@ class Controller:
                         axis=0) == 0).all(), "x-Axes through read files do not match"
 
         # Convert x-Axis between units and apply limits specified in settings
-        x_unit_applied = np.vectorize(convert_x)(dataset.files[0].x, self.settings.data.unit_in,
-                                                 self.settings.data.unit_out)
-        dataset.x_ranged, dataset.range_selection = apply_limits(x_unit_applied, selection_range=(self.settings.data.range_start,
-                                                                 self.settings.data.range_stop))
+        x_unit_applied = np.vectorize(convert_x, otypes=[float])(dataset.files[0].x, self.settings.data.unit_in,
+                                                                    self.settings.data.unit_out)
+        dataset.x_ranged, dataset.range_selection = apply_limits(x_unit_applied,
+                                                                 selection_range=(self.settings.data.range_start,
+                                                                                  self.settings.data.range_stop))
 
         # TODO: Option to use same jar for every dataset
         # Prepare jar-correction
@@ -111,6 +146,7 @@ class Controller:
             jar_file = jar.load_jar(filename, self.settings.jar.reference_file_head_row_count,
                                     (self.settings.jar.range_start, self.settings.jar.range_stop),
                                     dataset.range_selection)
+            dataset.jar_file = jar_file
 
         # Process data
         for file_index, file in enumerate(dataset.files):
@@ -137,7 +173,9 @@ class Controller:
                 # Apply jar-correction to intensity
                 intensity_pre_bkg = intensity_ranged
                 if self.settings.jar.enable:
-                    intensity_jar_corrected, jar_intensity_scaled, jar_scaling_factor = jar.jar_correct(jar_file, intensity_ranged, **self.bkg_params)
+                    intensity_jar_corrected, jar_intensity_scaled, jar_scaling_factor = jar.jar_correct(jar_file,
+                                                                                                        intensity_ranged,
+                                                                                                        **self.bkg_params)
 
                     ys_jar_corrected.append(intensity_jar_corrected)
                     ys_jar_scaled.append(jar_intensity_scaled)
@@ -185,6 +223,31 @@ class Controller:
 
                 # Plot data for first sample in first file
                 if file_index == column_index == 0:
+                    if self.settings.jar.plot.enable and self.settings.jar.enable:
+                        if self.settings.jar.plot.jar_original:
+                            plt.plot(dataset.x_ranged, jar_file.ys[0], label="Jar Intensity (Original)")
+                        if self.settings.jar.plot.jar_ranged:
+                            plt.plot(jar_file.x_ranged, jar_file.ys_ranged[0], label="Jar Intensity (Ranged)")
+                        if self.settings.jar.plot.jar_baseline:
+                            plt.plot(jar_file.x_ranged, jar_file.ys_background_baseline[0],
+                                     label="Jar Baseline (Ranged)")
+                        if self.settings.jar.plot.jar_corrected:
+                            plt.plot(jar_file.x_ranged, jar_file.ys_background_corrected[0],
+                                     label="Jar Intensity (Corrected, Ranged)")
+                        if self.settings.jar.plot.jar_scaled:
+                            plt.plot(dataset.x_ranged, jar_intensity_scaled, label="Jar Intensity (Corrected, Scaled)")
+                        if self.settings.jar.plot.intensity_original:
+                            plt.plot(dataset.x_ranged, intensity_ranged, label="Intensity (Pre-Jar-Correction)")
+                        if self.settings.jar.plot.intensity_corrected:
+                            plt.plot(dataset.x_ranged, intensity_jar_corrected, label="Intensity (Jar-Corrected)")
+
+                        plt.xlabel("x")
+                        plt.ylabel("intensity")
+                        plt.legend(loc="upper right")
+                        plt.title(f"file {file_index}, column {column_index}")
+
+                        plt.show()
+
                     if self.settings.baseline.plot.enable and self.settings.baseline.enable:
                         if self.settings.baseline.plot.original:
                             plt.plot(dataset.x_ranged, intensity_ranged, label="Intensity (Original)")
@@ -194,29 +257,6 @@ class Controller:
                             plt.plot(dataset.x_ranged, intensity_pre_norm, label="Intensity (Corrected)")
                         if self.settings.baseline.plot.corrected_normalized:
                             plt.plot(dataset.x_ranged, intensity_final, label="Intensity (Corrected, Normalized")
-
-                        plt.xlabel("x")
-                        plt.ylabel("intensity")
-                        plt.legend(loc="upper right")
-                        plt.title(f"file {file_index}, column {column_index}")
-
-                        plt.show()
-
-                    if self.settings.jar.plot.enable and self.settings.jar.enable:
-                        if self.settings.jar.plot.jar_original:
-                            plt.plot(dataset.x_ranged, jar_file.ys[0], label="Jar Intensity (Original)")
-                        if self.settings.jar.plot.jar_ranged:
-                            plt.plot(jar_file.x_ranged, jar_file.ys_ranged[0], label="Jar Intensity (Ranged)")
-                        if self.settings.jar.plot.jar_baseline:
-                            plt.plot(jar_file.x_ranged, jar_file.ys_background_baseline[0], label="Jar Baseline (Ranged)")
-                        if self.settings.jar.plot.jar_corrected:
-                            plt.plot(jar_file.x_ranged, jar_file.ys_background_corrected[0], label="Jar Intensity (Corrected, Ranged)")
-                        if self.settings.jar.plot.jar_scaled:
-                            plt.plot(dataset.x_ranged, jar_intensity_scaled, label="Jar Intensity (Corrected, Scaled)")
-                        if self.settings.jar.plot.intensity_original:
-                            plt.plot(dataset.x_ranged, intensity_ranged, label="Intensity (Pre-Jar-Correction)")
-                        if self.settings.jar.plot.intensity_corrected:
-                            plt.plot(dataset.x_ranged, intensity_jar_corrected, label="Intensity (Jar-Corrected)")
 
                         plt.xlabel("x")
                         plt.ylabel("intensity")
@@ -240,17 +280,79 @@ class Controller:
         # Join results of individual files into single array
         dataset.x_result = dataset.files[0].x_result if len(dataset.files) != 0 else None
         dataset.ys_result = np.vstack([file.ys_result for file in dataset.files])
+        dataset.ys_jar = np.vstack([file.ys_jar_corrected for file in dataset.files])
 
-        # TODO: Get ROI integration data on whole DataSet intensity
+        base_dir = dataset.base_dir() if not os.path.isabs(self.settings.io.out_dir) else ""
 
-        # TODO: Construct "Output" DataFile instance with result data
-        # TODO: Write output data to file
+        # Write final results to output file
+        baseline_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.baseline.out_dir)
+        dataset.export_baseline(baseline_out_dir, sep=self.settings.io.dat_file_sep)
 
-        # TODO: Plot data
+        # Write jar-corrected data to output file
+        if self.settings.jar.enable:
+            jar_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.jar.out_dir)
+            dataset.export_jar(jar_out_dir, sep=self.settings.io.dat_file_sep)
+
+        # ROI integration data processing
+        if self.settings.rois.enable:
+            # Get ROI integration data on whole DataSet intensity
+            dataset.roi_values = np.array(
+                [[get_area(dataset.x_result, y_result, range_min, range_max) for y_result in dataset.ys_result]
+                 for (range_min, range_max, _) in self.settings.rois.ranges]
+            )
+
+            dataset.roi_values_normalized, mean_error = normalize(dataset.roi_values)
+
+            # Write ROI integration data to output file
+            rois_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.rois.out_dir)
+            export_rois(dataset.roi_values_normalized, [file.filename for file in dataset.files],
+                        self.settings.rois.ranges, rois_out_dir, dataset.dataset_name)
+
+            # Plot ROI integration data
+            if self.settings.rois.plot.enable:
+                fig, (ax1, ax2) = plt.subplots(1, 2, sharey="row", gridspec_kw={"width_ratios": [5, 2]})
+
+                y_scale = np.arange(0, dataset.ys_result.shape[0] * self.settings.rois.plot.time_step)
+                extent = [np.min(dataset.x_result), np.max(dataset.x_result), np.min(y_scale), np.max(y_scale)]
+
+                if self.settings.rois.plot.flip_y:
+                    img_data = np.flip(dataset.ys_result)
+                    rois_data = dataset.roi_values_normalized[:, ::-1]
+                else:
+                    img_data = dataset.ys_result
+                    rois_data = dataset.roi_values_normalized
+
+                    ax1.invert_yaxis()
+
+                # Plot intensity data as heatmap and scatter ROI integration areas as
+                ax1.imshow(img_data, extent=extent, cmap=self.settings.rois.plot.heatmap)
+                for roi_areas, (_, _, color) in zip(rois_data, self.settings.rois.ranges):
+                    if color.strip() == "":
+                        color = None
+
+                    ax2.scatter(roi_areas, y_scale, s=5, c=color)
+
+                # Set plot options
+                ax1.set_xlabel(unit_x_str(self.settings.data.unit_out))
+                ax1.set_ylabel("Time [s]")
+                ax1.set_xlim(extent[0], extent[1])
+                ax1.set_ylim(extent[2], extent[3])
+                ax1.set_aspect("auto")
+                ax2.tick_params(
+                    axis='y',
+                    which="both",
+                    left=False,
+                    right=False,
+                    labelleft=False
+                )
+                ax2.set_xlabel("Norm. Intensity")
+
+                # Save figure to file
+                fig.tight_layout()
+                fig.savefig(os.path.join(rois_out_dir, "rois_" + dataset.dataset_name + "_plot.png"))
+                plt.close(fig)
 
     def run(self):
-        # TODO: Current approach expects same x for all files -> Group files in datasets?
-
         # Load files and extend headers with parameters specified in settings
         self.load_files()
         self.extend_headers()
@@ -263,4 +365,3 @@ class Controller:
 if __name__ == "__main__":
     controller = Controller()
     controller.run()
-

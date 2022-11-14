@@ -13,8 +13,8 @@ class DataFile:
         self.data: np.ndarray = content
         self.head: List[str] = head
 
-        self.x = np.copy(self.data[0])
-        self.ys = np.copy(self.data[1:])
+        self.x = np.copy(self.data[0]) if self.data.size != 0 else np.array([])
+        self.ys = np.copy(self.data[1:]) if self.data.size != 0 else np.array([])
 
         self.x_ranged = np.array([])
         self.ys_ranged = np.array([])
@@ -34,20 +34,23 @@ class DataFile:
 
     def write_dat(self, out_dir: str, sep: str):
         head = self.head if self.head is not None else []
-        data = np.concatenate((self.x_result.reshape(1, -1), self.ys_result))
+        data = np.concatenate((self.x_result.reshape(1, -1), self.ys_result)).T
 
         # Join all columns to rows
         output_list = map(lambda y: sep.join(map(lambda x: "%2.7e" % x, y)), data)
         body = '\n'.join(output_list)
 
-        data_enc = bytes('\n'.join(head) + '\n' + body)
-        with open(os.path.join(out_dir, self.filename), "wb+") as out_stream:
-            out_stream.write(data_enc)
+        data = '\n'.join(head) + '\n' + body
+        with open(os.path.join(out_dir, self.filename), "w+") as out_stream:
+            out_stream.write(data)
+
+        # TODO: Change to logging
+        print(f"Wrote data to {out_dir}")
 
     def extend_head(self, script_version: str, **params):
         head_extension = [
             f"BackgroundCorrection.py (Version {script_version})",
-            "".join([f", {param_name} = {param_value}" for param_name, param_value in params.items()])
+            "".join([f", {param_name} = {param_value}" for param_name, param_value in params.items()])[2:]
         ]
 
         self.head = [*head_extension, *self.head]
