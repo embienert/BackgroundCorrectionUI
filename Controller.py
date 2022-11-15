@@ -96,7 +96,7 @@ class Controller:
                 raise FileNotFoundError("No path provided. Aborting.")
 
             files_subdirs = [subdir.path for subdir in os.scandir(files_dir)
-                             if subdir.is_dir() and subdir.name != self.settings.io.out_dir]
+                             if subdir.is_dir() and subdir.name != os.path.basename(self.settings.io.out_dir)]
             subdir_files = [[file.path for file in os.scandir(subdir) if os.path.isfile(file)]
                             for subdir in [files_dir, *files_subdirs]]
 
@@ -285,13 +285,45 @@ class Controller:
         base_dir = dataset.base_dir() if not os.path.isabs(self.settings.io.out_dir) else ""
 
         # Write final results to output file
-        baseline_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.baseline.out_dir)
-        dataset.export_baseline(baseline_out_dir, sep=self.settings.io.dat_file_sep)
+        if self.settings.baseline.enable:
+            baseline_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.baseline.out_dir)
+            dataset.export_baseline(baseline_out_dir, sep=self.settings.io.dat_file_sep)
 
         # Write jar-corrected data to output file
         if self.settings.jar.enable:
             jar_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.jar.out_dir)
             dataset.export_jar(jar_out_dir, sep=self.settings.io.dat_file_sep)
+
+
+        # Plotting
+        if self.settings.baseline.plot.enable or (self.settings.rois.enable and self.settings.rois.plot.enable):
+            # Generate subplots
+            if self.settings.rois.enable and self.settings.rois.plot.enable:
+                fig, (ax_intensity, ax_rois) = plt.subplots(1, 2, sharey="row", gridspec_kw={"width_ratios": [5, 2]})
+            else:
+                fig, ax_intensity = plt.subplots()
+
+            # Plot result intensities
+            y_scale = np.arange(0, dataset.ys_result.shape[0] * self.settings.rois.plot.time_step)
+            extent = [np.min(dataset.x_result), np.max(dataset.x_result), np.min(y_scale), np.max(y_scale)]
+
+            if self.settings.rois.plot.flip_y:
+                img_data = np.flip(dataset.ys_result)
+            else:
+                img_data = dataset.ys_result
+
+                ax_intensity.invert_yaxis()
+
+            # Plot intensity data as heatmap and scatter ROI integration areas as
+            ax_intensity.imshow(img_data, extent=extent, cmap=self.settings.rois.plot.heatmap)
+
+            # Set plot options
+            ax_intensity.set_xlabel(unit_x_str(self.settings.data.unit_out))
+            ax_intensity.set_ylabel("Time [s]")
+            ax_intensity.set_xlim(extent[0], extent[1])
+            ax_intensity.set_ylim(extent[2], extent[3])
+            ax_intensity.set_aspect("auto")
+
 
         # ROI integration data processing
         if self.settings.rois.enable:
@@ -310,47 +342,37 @@ class Controller:
 
             # Plot ROI integration data
             if self.settings.rois.plot.enable:
-                fig, (ax1, ax2) = plt.subplots(1, 2, sharey="row", gridspec_kw={"width_ratios": [5, 2]})
-
-                y_scale = np.arange(0, dataset.ys_result.shape[0] * self.settings.rois.plot.time_step)
-                extent = [np.min(dataset.x_result), np.max(dataset.x_result), np.min(y_scale), np.max(y_scale)]
-
                 if self.settings.rois.plot.flip_y:
-                    img_data = np.flip(dataset.ys_result)
                     rois_data = dataset.roi_values_normalized[:, ::-1]
                 else:
-                    img_data = dataset.ys_result
                     rois_data = dataset.roi_values_normalized
 
-                    ax1.invert_yaxis()
-
                 # Plot intensity data as heatmap and scatter ROI integration areas as
-                ax1.imshow(img_data, extent=extent, cmap=self.settings.rois.plot.heatmap)
                 for roi_areas, (_, _, color) in zip(rois_data, self.settings.rois.ranges):
                     if color.strip() == "":
                         color = None
 
-                    ax2.scatter(roi_areas, y_scale, s=5, c=color)
+                    ax_rois.scatter(roi_areas, y_scale, s=5, c=color)
 
                 # Set plot options
-                ax1.set_xlabel(unit_x_str(self.settings.data.unit_out))
-                ax1.set_ylabel("Time [s]")
-                ax1.set_xlim(extent[0], extent[1])
-                ax1.set_ylim(extent[2], extent[3])
-                ax1.set_aspect("auto")
-                ax2.tick_params(
+                ax_rois.tick_params(
                     axis='y',
                     which="both",
                     left=False,
                     right=False,
                     labelleft=False
                 )
-                ax2.set_xlabel("Norm. Intensity")
+                ax_rois.set_xlabel("Norm. Intensity")
 
                 # Save figure to file
                 fig.tight_layout()
-                fig.savefig(os.path.join(rois_out_dir, "rois_" + dataset.dataset_name + "_plot.png"))
-                plt.close(fig)
+                fig.savefig(os.path.join(rois_out_dir, dataset.dataset_name + "_rois.png"))
+
+        if self.settings.baseline.plot.enable:
+            if not (self.settings.rois.enable and self.settings.rois.plot.enable):
+                fig.savefig(os.path.join(baseline_out_dir, dataset.dataset_name + ".png"))
+            plt.close(fig)
+
 
     def run(self):
         # Load files and extend headers with parameters specified in settings

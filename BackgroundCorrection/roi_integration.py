@@ -17,7 +17,7 @@ def normalize(roi_areas):
     target_y = np.ones(roi_areas.shape[1])
     roi_scales, error_sq_sum, _, _ = np.linalg.lstsq(roi_areas.T, target_y, rcond=None)
 
-    roi_areas_scaled = (roi_scales.T * roi_scales).T
+    roi_areas_scaled = (roi_areas.T * roi_scales).T
     mean_error = np.sqrt(error_sq_sum / target_y.shape[0])
 
     return roi_areas_scaled, mean_error
@@ -32,6 +32,6 @@ def export_rois(rois_values, filenames, rois_ranges, out_dir, name: str = ""):
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
 
-    np.savetxt(os.path.join(out_dir, "rois_" + name + ".csv"), export_data, delimiter=",", fmt="%s", header=header, comments="")
+    np.savetxt(os.path.join(out_dir, name + "_rois.csv"), export_data, delimiter=",", fmt="%s", header=header, comments="")
 
 
