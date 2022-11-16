@@ -304,7 +304,7 @@ class Controller:
                 fig, ax_intensity = plt.subplots()
 
             # Plot result intensities
-            y_scale = np.arange(0, dataset.ys_result.shape[0] * self.settings.rois.plot.time_step)
+            y_scale = np.arange(0, dataset.ys_result.shape[0] * self.settings.rois.plot.time_step, self.settings.rois.plot.time_step)
             extent = [np.min(dataset.x_result), np.max(dataset.x_result), np.min(y_scale), np.max(y_scale)]
 
             if self.settings.rois.plot.flip_y:

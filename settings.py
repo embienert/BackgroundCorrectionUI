@@ -7,7 +7,7 @@ defaults = {
     "io": {
         "out_dir": "out",
         "dat_file_sep": '\t',
-        "head_row_count": 4
+        "head_row_count": 0
     },
     "data": {
         "range_start": -(2 ** 32 - 1),
@@ -50,7 +50,6 @@ defaults = {
     "rois": {
         "enable": False,
         "ranges": [
-            []
         ],
         "out_dir": "",
         "plot": {
