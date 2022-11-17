@@ -1,6 +1,8 @@
-import pyspectra as spc
+import spc_spectra as spc
 import pandas as pd
 import numpy as np
+
+import pyspectra.readers.read_spc
 
 from typing import List
 import os.path
@@ -90,7 +92,7 @@ def read_spc(filename: str) -> (np.ndarray, List[str], List[str]):
             out["RamanShift (cm-1)"] = x
             out[str(round(s.subtime))] = y
 
-    return out.to_numpy(dtype=np.float64), []
+    return out.to_numpy(dtype=np.float64).T, []
 
 
 def read(filename: str, head_rows: int) -> DataFile:
