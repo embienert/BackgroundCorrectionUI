@@ -148,6 +148,8 @@ class Controller:
                                     dataset.range_selection)
             dataset.jar_file = jar_file
 
+        dataset_labels = []
+
         # Process data
         for file_index, file in enumerate(dataset.files):
             print(f"Processing file {file_index}")
@@ -220,9 +222,10 @@ class Controller:
                     intensity_final = intensity_normalized
 
                 ys_result.append(intensity_final)
+                dataset_labels.append(f"{file.filename} [{column_index}]")
 
                 # Plot data for first sample in first file
-                if file_index == column_index == 0:
+                if [file_index, column_index] in self.settings.baseline.plot.test_datasets:
                     if self.settings.jar.plot.enable and self.settings.jar.enable:
                         if self.settings.jar.plot.jar_original:
                             plt.plot(dataset.x_ranged, jar_file.ys[0], label="Jar Intensity (Original)")
@@ -283,17 +286,19 @@ class Controller:
         dataset.ys_jar = np.vstack([file.ys_jar_corrected for file in dataset.files])
 
         base_dir = dataset.base_dir() if not os.path.isabs(self.settings.io.out_dir) else ""
+        baseline_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.baseline.out_dir)
+
+        if not os.path.exists(baseline_out_dir):
+            os.mkdir(baseline_out_dir)
 
         # Write final results to output file
         if self.settings.baseline.enable:
-            baseline_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.baseline.out_dir)
             dataset.export_baseline(baseline_out_dir, sep=self.settings.io.dat_file_sep)
 
         # Write jar-corrected data to output file
         if self.settings.jar.enable:
             jar_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.jar.out_dir)
             dataset.export_jar(jar_out_dir, sep=self.settings.io.dat_file_sep)
-
 
         # Plotting
         if self.settings.baseline.plot.enable or (self.settings.rois.enable and self.settings.rois.plot.enable):
@@ -307,23 +312,30 @@ class Controller:
             y_scale = np.arange(0, dataset.ys_result.shape[0] * self.settings.rois.plot.time_step, self.settings.rois.plot.time_step)
             extent = [np.min(dataset.x_result), np.max(dataset.x_result), np.min(y_scale), np.max(y_scale)]
 
-            if self.settings.rois.plot.flip_y:
-                img_data = np.flip(dataset.ys_result)
+            if not self.settings.rois.plot.flip_y:
+                img_data = np.flip(dataset.ys_result, axis=0)
             else:
                 img_data = dataset.ys_result
 
-                ax_intensity.invert_yaxis()
+                extent[2], extent[3] = extent[3], extent[2]
+
+            if self.settings.rois.plot.flip_x:
+                # Flip x-Axis extents
+                extent[0], extent[1] = extent[1], extent[0]
+            else:
+                img_data = np.flip(img_data, axis=1)
 
             # Plot intensity data as heatmap and scatter ROI integration areas as
-            ax_intensity.imshow(img_data, extent=extent, cmap=self.settings.rois.plot.heatmap)
+            intensity_plot = ax_intensity.imshow(img_data, extent=extent, cmap=self.settings.rois.plot.heatmap)
 
             # Set plot options
-            ax_intensity.set_xlabel(unit_x_str(self.settings.data.unit_out))
-            ax_intensity.set_ylabel("Time [s]")
+            if self.settings.rois.plot.colorbar:
+                fig.colorbar(intensity_plot, ax=ax_intensity)
+            ax_intensity.set_xlabel(unit_x_str(self.settings.data.unit_out) if not self.settings.rois.plot.x_unit else self.settings.rois.plot.x_unit)
+            ax_intensity.set_ylabel(f"Time [{self.settings.rois.plot.y_unit}]")
             ax_intensity.set_xlim(extent[0], extent[1])
             ax_intensity.set_ylim(extent[2], extent[3])
             ax_intensity.set_aspect("auto")
-
 
         # ROI integration data processing
         if self.settings.rois.enable:
@@ -337,7 +349,7 @@ class Controller:
 
             # Write ROI integration data to output file
             rois_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.rois.out_dir)
-            export_rois(dataset.roi_values_normalized, [file.filename for file in dataset.files],
+            export_rois(dataset.roi_values_normalized, dataset_labels,
                         self.settings.rois.ranges, rois_out_dir, dataset.dataset_name)
 
             # Plot ROI integration data
@@ -371,7 +383,14 @@ class Controller:
         if self.settings.baseline.plot.enable:
             if not (self.settings.rois.enable and self.settings.rois.plot.enable):
                 fig.savefig(os.path.join(baseline_out_dir, dataset.dataset_name + ".png"))
+            # fig.show()
+            ax = ax_intensity
+
             plt.close(fig)
+
+            # Create interactive plot
+            plt.sca(ax)
+            plt.show()
 
 
     def run(self):

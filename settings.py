@@ -27,7 +27,10 @@ defaults = {
             "original": True,
             "baseline": True,
             "corrected": True,
-            "corrected_normalized": False
+            "corrected_normalized": False,
+            "test_datasets": [
+                [0, 0],  # First number is file index, second number is column index within specified file
+            ]
         }
     },
     "jar": {
@@ -55,7 +58,10 @@ defaults = {
         "plot": {
             "enable": True,
             "time_step": 1,
+            "flip_x": False,
             "flip_y": False,
+            "x_unit": "",
+            "y_unit": "s",
             "heatmap": "hot"
         }
     },
