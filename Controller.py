@@ -30,6 +30,9 @@ class DataSet:
         self.files: List[reader.DataFile] = files
         self.dataset_name: str = name
 
+        if len(self.files) == 1 and self.dataset_name == "dataset":
+            self.dataset_name = ".".join(os.path.basename(self.files[0].filename).split(".")[:-1])
+
         self.jar_file: Union[reader.DataFile, None] = None
 
         self.x_ranged = None
