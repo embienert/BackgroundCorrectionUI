@@ -55,14 +55,13 @@ defaults = {
         "ranges": [
         ],
         "out_dir": "",
+        "normalize": {
+            "sum": True,
+            "sum_linear": False,
+        },
         "plot": {
             "enable": True,
-            "time_step": 1,
-            "flip_x": False,
-            "flip_y": False,
-            "x_unit": "",
-            "y_unit": "s",
-            "heatmap": "hot"
+            "ratio": [6, 2]
         }
     },
     "normalization": {
@@ -70,6 +69,18 @@ defaults = {
         "sum": False,
         "max": False,
         "ground": False,
+    },
+    "plot": {
+        "enable": True,
+        "time_step": 1,
+        "flip_x_data": False,
+        "flip_y_data": False,
+        "flip_x_ticks": False,
+        "flip_y_ticks": False,
+        "x_unit": "",
+        "y_unit": "s",
+        "heatmap": "hot",
+        "colorbar": False
     }
 }
 
@@ -100,6 +111,8 @@ def _overwrite_settings(settings: dict, other_settings: dict) -> DDict:
             if key in other_settings.keys() and isinstance(other_settings[key], dict):
                 # Recursive call
                 settings[key] = _overwrite_settings(value, other_settings[key])
+            else:
+                settings[key] = _overwrite_settings(value, value)
 
         if key in other_settings.keys() and not isinstance(other_settings[key], dict):
             settings[key] = other_settings[key]

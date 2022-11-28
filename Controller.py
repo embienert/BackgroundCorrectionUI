@@ -11,7 +11,7 @@ import os
 import BackgroundCorrection.algorithm as algorithm
 import BackgroundCorrection.reader as reader
 from BackgroundCorrection import jar
-from BackgroundCorrection.roi_integration import get_area, normalize, export_rois
+from BackgroundCorrection.roi_integration import get_area, normalize, normalize_linear, export_rois
 from BackgroundCorrection.units import convert_x, unit_x_str
 from BackgroundCorrection.util import apply_limits, normalize_area, normalize_max, ground, normalize_sum
 from settings import load_settings
@@ -307,35 +307,36 @@ class Controller:
         if self.settings.baseline.plot.enable or (self.settings.rois.enable and self.settings.rois.plot.enable):
             # Generate subplots
             if self.settings.rois.enable and self.settings.rois.plot.enable:
-                fig, (ax_intensity, ax_rois) = plt.subplots(1, 2, sharey="row", gridspec_kw={"width_ratios": [5, 2]})
+                fig, (ax_intensity, ax_rois) = plt.subplots(1, 2, sharey="row", gridspec_kw={"width_ratios": self.settings.rois.plot.ratio})
             else:
                 fig, ax_intensity = plt.subplots()
 
             # Plot result intensities
-            y_scale = np.arange(0, dataset.ys_result.shape[0] * self.settings.rois.plot.time_step, self.settings.rois.plot.time_step)
+            y_scale = np.arange(0, dataset.ys_result.shape[0] * self.settings.plot.time_step, self.settings.plot.time_step)
             extent = [np.min(dataset.x_result), np.max(dataset.x_result), np.min(y_scale), np.max(y_scale)]
 
-            if not self.settings.rois.plot.flip_y:
+            if not self.settings.plot.flip_y_data:
                 img_data = np.flip(dataset.ys_result, axis=0)
             else:
                 img_data = dataset.ys_result
 
-                extent[2], extent[3] = extent[3], extent[2]
-
-            if self.settings.rois.plot.flip_x:
-                # Flip x-Axis extents
-                extent[0], extent[1] = extent[1], extent[0]
-            else:
+            if self.settings.plot.flip_x_data:
                 img_data = np.flip(img_data, axis=1)
 
+            if self.settings.plot.flip_y_ticks:
+                extent[2], extent[3] = extent[3], extent[2]
+
+            if self.settings.plot.flip_x_ticks:
+                extent[0], extent[1] = extent[1], extent[0]
+
             # Plot intensity data as heatmap and scatter ROI integration areas as
-            intensity_plot = ax_intensity.imshow(img_data, extent=extent, cmap=self.settings.rois.plot.heatmap)
+            intensity_plot = ax_intensity.imshow(img_data, extent=extent, cmap=self.settings.plot.heatmap)
 
             # Set plot options
-            if self.settings.rois.plot.colorbar:
+            if self.settings.plot.colorbar:
                 fig.colorbar(intensity_plot, ax=ax_intensity)
-            ax_intensity.set_xlabel(unit_x_str(self.settings.data.unit_out) if not self.settings.rois.plot.x_unit else self.settings.rois.plot.x_unit)
-            ax_intensity.set_ylabel(f"Time [{self.settings.rois.plot.y_unit}]")
+            ax_intensity.set_xlabel(unit_x_str(self.settings.data.unit_out) if not self.settings.plot.x_unit else self.settings.plot.x_unit)
+            ax_intensity.set_ylabel(f"Time [{self.settings.plot.y_unit}]")
             ax_intensity.set_xlim(extent[0], extent[1])
             ax_intensity.set_ylim(extent[2], extent[3])
             ax_intensity.set_aspect("auto")
@@ -348,7 +349,12 @@ class Controller:
                  for (range_min, range_max, _) in self.settings.rois.ranges]
             )
 
-            dataset.roi_values_normalized, mean_error = normalize(dataset.roi_values)
+            if self.settings.rois.normalize.sum:
+                dataset.roi_values_normalized, mean_error = normalize(dataset.roi_values)
+            elif self.settings.rois.normalize.sum_linear:
+                dataset.roi_values_normalized, mean_error = normalize_linear(dataset.roi_values)
+            else:
+                dataset.roi_values_normalized, mean_error = dataset.roi_values, 0
 
             # Write ROI integration data to output file
             rois_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.rois.out_dir)
@@ -357,10 +363,13 @@ class Controller:
 
             # Plot ROI integration data
             if self.settings.rois.plot.enable:
-                if self.settings.rois.plot.flip_y:
-                    rois_data = dataset.roi_values_normalized[:, ::-1]
+                if self.settings.plot.flip_y_data:
+                    rois_data = np.flip(dataset.roi_values_normalized, axis=1)
                 else:
                     rois_data = dataset.roi_values_normalized
+
+                if self.settings.plot.flip_y_ticks:
+                    y_scale = np.flip(y_scale)
 
                 # Plot intensity data as heatmap and scatter ROI integration areas as
                 for roi_areas, (_, _, color) in zip(rois_data, self.settings.rois.ranges):
