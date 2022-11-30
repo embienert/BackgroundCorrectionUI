@@ -25,7 +25,7 @@ def normalize_linear(roi_areas) -> (np.ndarray, float):
 
 
 def normalize(roi_areas):
-    roi_areas = normalize_linear(roi_areas)
+    roi_areas, error = normalize_linear(roi_areas)
 
     target_y = np.ones(roi_areas.shape[1])
 
