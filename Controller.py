@@ -11,7 +11,8 @@ import os
 import BackgroundCorrection.algorithm as algorithm
 import BackgroundCorrection.reader as reader
 from BackgroundCorrection import jar
-from BackgroundCorrection.roi_integration import get_area, normalize, normalize_linear, export_rois
+from BackgroundCorrection.roi_integration import get_area, export_rois
+from BackgroundCorrection import roi_integration
 from BackgroundCorrection.units import convert_x, unit_x_str
 from BackgroundCorrection.util import apply_limits, normalize_area, normalize_max, ground, normalize_sum
 from settings import load_settings
@@ -343,16 +344,24 @@ class Controller:
 
         # ROI integration data processing
         if self.settings.rois.enable:
+            if dataset.x_result[0] > dataset.x_result[-1]:
+                # x-Axis decrementing --> Flip ROIs for successful integration
+                flip_roi = True
+            else:
+                flip_roi = False
+
             # Get ROI integration data on whole DataSet intensity
             dataset.roi_values = np.array(
-                [[get_area(dataset.x_result, y_result, range_min, range_max) for y_result in dataset.ys_result]
+                [[get_area(dataset.x_result, y_result, range_min, range_max, flip=flip_roi) for y_result in dataset.ys_result]
                  for (range_min, range_max, _) in self.settings.rois.ranges]
             )
 
             if self.settings.rois.normalize.sum:
-                dataset.roi_values_normalized, mean_error = normalize(dataset.roi_values)
+                dataset.roi_values_normalized, mean_error = roi_integration.normalize(dataset.roi_values)
             elif self.settings.rois.normalize.sum_linear:
-                dataset.roi_values_normalized, mean_error = normalize_linear(dataset.roi_values)
+                dataset.roi_values_normalized, mean_error = roi_integration.normalize_linear(dataset.roi_values)
+            elif self.settings.rois.normalize.max:
+                dataset.roi_values_normalized, mean_error = roi_integration.normalize_max(dataset.roi_values)
             else:
                 dataset.roi_values_normalized, mean_error = dataset.roi_values, 0
 

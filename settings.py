@@ -58,6 +58,7 @@ defaults = {
         "normalize": {
             "sum": True,
             "sum_linear": False,
+            "max": False,
         },
         "plot": {
             "enable": True,

@@ -3,11 +3,15 @@ from scipy.optimize import lsq_linear
 import os
 
 
-def get_area(x, intensities, roi_min, roi_max):
+def get_area(x, intensities, roi_min, roi_max, flip=False):
     selection = (x >= roi_min) & (x <= roi_max)
 
     x_ranged = x[selection]
     intensities_ranged = intensities[selection]
+
+    if flip:
+        x_ranged = np.flip(x_ranged)
+        intensities_ranged = np.flip(intensities_ranged, axis=0)
 
     y_area = np.trapz(x=x_ranged, y=intensities_ranged)
 
@@ -20,6 +24,9 @@ def normalize_linear(roi_areas) -> (np.ndarray, float):
 
     roi_areas_scaled = roi_areas * linear_scale
     mean_error = np.mean(np.ones(roi_areas.shape[1]) - roi_areas_scaled)
+
+    print("Scaling factor:", linear_scale)
+    print("Error:", mean_error)
 
     return roi_areas_scaled, mean_error
 
@@ -44,6 +51,13 @@ def normalize(roi_areas):
     print("Error:", mean_error)
 
     return roi_areas_scaled, mean_error
+
+
+def normalize_max(roi_areas):
+    scaling_factor = 1 / np.max(roi_areas)
+    roi_areas_scaled = roi_areas * scaling_factor
+
+    return roi_areas_scaled, 0
 
 
 def export_rois(rois_values, filenames, rois_ranges, out_dir, name: str = ""):
