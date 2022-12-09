@@ -331,7 +331,7 @@ class Controller:
             dataset.export_jar(jar_out_dir, sep=self.settings.io.dat_file_sep)
 
         # Plotting
-        if self.settings.baseline.plot.enable or (self.settings.rois.enable and self.settings.rois.plot.enable):
+        if self.settings.plot.enable or (self.settings.rois.enable and self.settings.rois.plot.enable):
             # Generate subplots
             if self.settings.rois.enable and self.settings.rois.plot.enable:
                 fig, (ax_intensity, ax_rois) = plt.subplots(1, 2, sharey="row",
@@ -431,7 +431,7 @@ class Controller:
                 fig.tight_layout()
                 fig.savefig(os.path.join(rois_out_dir, dataset.dataset_name + "_rois.png"))
 
-        if self.settings.baseline.plot.enable:
+        if self.settings.plot.enable:
             if not (self.settings.rois.enable and self.settings.rois.plot.enable):
                 fig.savefig(os.path.join(baseline_out_dir, dataset.dataset_name + ".png"))
             # fig.show()
