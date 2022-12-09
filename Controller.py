@@ -14,7 +14,7 @@ from BackgroundCorrection import jar
 from BackgroundCorrection.roi_integration import get_area, export_rois
 from BackgroundCorrection import roi_integration
 from BackgroundCorrection.units import convert_x, unit_x_str
-from BackgroundCorrection.util import apply_limits, normalize_area, normalize_max, ground, normalize_sum
+from BackgroundCorrection.util import apply_limits, normalize_area, normalize_max, ground, normalize_sum, ranges
 from settings import load_settings
 
 matplotlib.use("QtAgg")
@@ -129,12 +129,38 @@ class Controller:
         # Check if x-Axes match through input files
         print("Checking x-Axes")
         xs = [file.x for file in dataset.files]
-        assert (np.diff(np.vstack(xs).reshape(len(xs), -1),
-                        axis=0) == 0).all(), "x-Axes through read files do not match"
+        xs_diff = np.diff(np.vstack(xs).reshape(len(xs), -1),
+                          axis=0) == 0
+        if not xs_diff.all():
+            failed_positions = []
+            first_x = xs[0]
+
+            for index, x in enumerate(xs[1:]):
+                diff = (first_x - x) == 0
+                if diff.all():
+                    continue
+
+                trouble_indices = np.where(diff == False)[0]
+                trouble_indices_ranges = list(ranges(trouble_indices.tolist()))
+
+                trouble_indices_ranges_str = []
+                for ti_range in trouble_indices_ranges:
+                    start, stop = ti_range
+                    if start == stop:
+                        trouble_indices_ranges_str.append(str(start))
+                    else:
+                        trouble_indices_ranges_str.append(str(start) + " to " + str(stop))
+
+                print(f"Found mismatching x-Axis values in file {os.path.basename(dataset.files[index+1].filename)} at indices\n\t"
+                      f"{','.join(trouble_indices_ranges_str)}")
+                failed_positions.extend(list(zip([index+1 for _ in range(len(trouble_indices_ranges))], trouble_indices_ranges)))
+
+            raise AssertionError(f"x-Axis value mismatch detected in {len(failed_positions)} file(s). Observe program output for exact position.")
+
 
         # Convert x-Axis between units and apply limits specified in settings
         x_unit_applied = np.vectorize(convert_x, otypes=[float])(dataset.files[0].x, self.settings.data.unit_in,
-                                                                    self.settings.data.unit_out)
+                                                                 self.settings.data.unit_out)
         dataset.x_ranged, dataset.range_selection = apply_limits(x_unit_applied,
                                                                  selection_range=(self.settings.data.range_start,
                                                                                   self.settings.data.range_stop))
@@ -308,12 +334,14 @@ class Controller:
         if self.settings.baseline.plot.enable or (self.settings.rois.enable and self.settings.rois.plot.enable):
             # Generate subplots
             if self.settings.rois.enable and self.settings.rois.plot.enable:
-                fig, (ax_intensity, ax_rois) = plt.subplots(1, 2, sharey="row", gridspec_kw={"width_ratios": self.settings.rois.plot.ratio})
+                fig, (ax_intensity, ax_rois) = plt.subplots(1, 2, sharey="row",
+                                                            gridspec_kw={"width_ratios": self.settings.rois.plot.ratio})
             else:
                 fig, ax_intensity = plt.subplots()
 
             # Plot result intensities
-            y_scale = np.arange(0, dataset.ys_result.shape[0] * self.settings.plot.time_step, self.settings.plot.time_step)
+            y_scale = np.arange(0, dataset.ys_result.shape[0] * self.settings.plot.time_step,
+                                self.settings.plot.time_step)
             extent = [np.min(dataset.x_result), np.max(dataset.x_result), np.min(y_scale), np.max(y_scale)]
 
             if not self.settings.plot.flip_y_data:
@@ -336,7 +364,8 @@ class Controller:
             # Set plot options
             if self.settings.plot.colorbar:
                 fig.colorbar(intensity_plot, ax=ax_intensity)
-            ax_intensity.set_xlabel(unit_x_str(self.settings.data.unit_out) if not self.settings.plot.x_unit else self.settings.plot.x_unit)
+            ax_intensity.set_xlabel(
+                unit_x_str(self.settings.data.unit_out) if not self.settings.plot.x_unit else self.settings.plot.x_unit)
             ax_intensity.set_ylabel(f"Time [{self.settings.plot.y_unit}]")
             ax_intensity.set_xlim(extent[0], extent[1])
             ax_intensity.set_ylim(extent[2], extent[3])
@@ -352,7 +381,8 @@ class Controller:
 
             # Get ROI integration data on whole DataSet intensity
             dataset.roi_values = np.array(
-                [[get_area(dataset.x_result, y_result, range_min, range_max, flip=flip_roi) for y_result in dataset.ys_result]
+                [[get_area(dataset.x_result, y_result, range_min, range_max, flip=flip_roi) for y_result in
+                  dataset.ys_result]
                  for (range_min, range_max, _) in self.settings.rois.ranges]
             )
 
@@ -412,7 +442,6 @@ class Controller:
             # Create interactive plot
             plt.sca(ax)
             plt.show()
-
 
     def run(self):
         # Load files and extend headers with parameters specified in settings

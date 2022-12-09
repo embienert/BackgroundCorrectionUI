@@ -125,3 +125,7 @@ def correct(data: np.ndarray, fkt: callable, **params):
     baseline = fkt(data, **params)
 
     return data - baseline, baseline
+
+
+if __name__ == '__main__':
+    print(algorithm_by_index(1))

@@ -1,4 +1,5 @@
 from typing import Tuple, Optional
+import itertools
 
 import numpy as np
 
@@ -16,6 +17,12 @@ def apply_limits(data: np.ndarray, selection_range: Optional[Tuple[float, float]
         selection = (data >= selection_min) & (data <= selection_max)
 
     return data[selection], selection
+
+
+def ranges(iterable):
+    for _, group in itertools.groupby(enumerate(iterable), lambda pair: pair[1] - pair[0]):
+        group = list(group)
+        yield group[0][1], group[-1][1]
 
 
 def normalize_area(x, y):
