@@ -1,4 +1,4 @@
-__version__ = "0.0 alpha"
+__version__ = "0.1 alpha"
 
 from tkinter.filedialog import askopenfilenames, askopenfilename, askdirectory
 import matplotlib.pyplot as plt
