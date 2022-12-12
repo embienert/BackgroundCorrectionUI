@@ -283,7 +283,7 @@ class Controller:
 
                     if self.settings.baseline.plot.enable and self.settings.baseline.enable:
                         intensity_ranged_plot = intensity_ranged if not self.settings.jar.enable else intensity_jar_corrected
-                        intensity_original_label = "Intensity (Original)" if self.settings.jar.enable else "Intensity (Jar-Corrected)"
+                        intensity_original_label = "Intensity (Original)" if not self.settings.jar.enable else "Intensity (Jar-Corrected)"
 
                         if self.settings.baseline.plot.original:
                             plt.plot(dataset.x_ranged, intensity_ranged_plot, label=intensity_original_label)
