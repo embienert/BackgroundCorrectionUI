@@ -12,12 +12,15 @@ def load_jar(filename: str, head_rows: int, jar_selection_range: Tuple[float, fl
     jar_intensity = jar_file.ys[0]
 
     jar_x_ranged, _ = apply_limits(jar_file.x, selection=x_selection)
-    jar_x_ranged, jar_selection = apply_limits(jar_x_ranged, selection_range=jar_selection_range)
+    jar_x_ranged2, jar_selection = apply_limits(jar_x_ranged, selection_range=jar_selection_range)
 
     jar_y_ranged, _ = apply_limits(jar_intensity, selection=x_selection)
     jar_intensity_ranged, _ = apply_limits(jar_y_ranged, selection=jar_selection)
 
-    jar_file.x_ranged = jar_x_ranged
+    jar_file.x = jar_x_ranged
+    jar_file.ys = np.array([jar_y_ranged])
+
+    jar_file.x_ranged = jar_x_ranged2
     jar_file.ys_ranged = np.array([jar_intensity_ranged])
     jar_file.range_selection = jar_selection
 
