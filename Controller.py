@@ -1,5 +1,6 @@
 __version__ = "0.1 alpha"
 
+from multiprocessing import Pool, cpu_count
 from tkinter.filedialog import askopenfilenames, askopenfilename, askdirectory
 import matplotlib.pyplot as plt
 import matplotlib
@@ -11,11 +12,15 @@ import os
 import BackgroundCorrection.algorithm as algorithm
 import BackgroundCorrection.reader as reader
 from BackgroundCorrection import jar
+from BackgroundCorrection.parallel import process_parallel
 from BackgroundCorrection.roi_integration import get_area, export_rois
 from BackgroundCorrection import roi_integration
 from BackgroundCorrection.units import convert_x, unit_x_str
-from BackgroundCorrection.util import apply_limits, normalize_area, normalize_max, ground, normalize_sum, ranges
+from BackgroundCorrection.util import apply_limits, normalize_area, normalize_max, ground, normalize_sum, ranges, \
+    dictify
 from settings import load_settings
+
+from tqdm import tqdm as loading_bar
 
 matplotlib.use("QtAgg")
 
@@ -71,6 +76,25 @@ class DataSet:
         return os.path.dirname(os.path.abspath(self.files[0].filename))
 
 
+class ProcessingResult:
+    def __init__(self):
+        self.y_ranged = np.array([])
+
+        self.y_jar_corrected = np.array([])
+        self.y_jar_scaled = np.array([])
+        self.jar_scaling_factor = np.nan
+
+        self.y_background_corrected = np.array([])
+        self.y_background_baseline = np.array([])
+
+        self.y_grounded = np.array([])
+        self.y_normalized = np.array([])
+
+        self.y_result = np.array([])
+
+        self.label = ""
+
+
 class Controller:
     def __init__(self):
         # TODO: Load settings / set defaults
@@ -122,6 +146,65 @@ class Controller:
 
         for file in self.files:
             file.extend_head(__version__, **params)
+
+    def process(self, intensity, dataset, jar_file=None):
+        result = ProcessingResult()
+
+        # Apply x-limits to intensity values
+        intensity_ranged, _ = apply_limits(intensity, selection=dataset.range_selection)
+        result.y_ranged = intensity_ranged
+
+        # Apply jar-correction to intensity
+        intensity_pre_bkg = intensity_ranged
+        if self.settings.jar.enable:
+            intensity_jar_corrected, jar_intensity_scaled, jar_scaling_factor = jar.jar_correct(jar_file,
+                                                                                                intensity_ranged,
+                                                                                                **self.bkg_params)
+
+            result.y_jar_corrected = intensity_jar_corrected
+            result.y_jar_scaled = jar_intensity_scaled
+            result.jar_scaling_factor = jar_scaling_factor
+
+            intensity_pre_bkg = intensity_jar_corrected
+
+        # Perform background correction on prepared intensity data
+        intensity_pre_ground = intensity_pre_bkg
+        if self.settings.baseline.enable:
+            intensity_corrected, baseline = algorithm.correct(intensity_pre_bkg, **self.bkg_params)
+            result.y_background_corrected = intensity_corrected
+            result.y_background_baseline = baseline
+
+            intensity_pre_ground = intensity_corrected
+
+        # Ground processed intensity data
+        intensity_pre_norm = intensity_pre_ground
+        if self.settings.normalization.ground:
+            intensity_grounded = ground(intensity_pre_ground)
+            result.y_grounded = intensity_grounded
+
+            intensity_pre_norm = intensity_grounded
+
+        # Normalize processed intensity data
+        intensity_final = intensity_pre_norm
+        if self.settings.normalization.area:
+            intensity_normalized = normalize_area(x=dataset.x_ranged, y=intensity_pre_norm)
+            result.y_normalized = intensity_normalized
+
+            intensity_final = intensity_normalized
+        elif self.settings.normalization.sum:
+            intensity_normalized = normalize_sum(intensity_pre_norm)
+            result.y_normalized = intensity_normalized
+
+            intensity_final = intensity_normalized
+        elif self.settings.normalization.max:
+            intensity_normalized = normalize_max(intensity_pre_norm)
+            result.y_normalized = intensity_normalized
+
+            intensity_final = intensity_normalized
+
+        result.y_result = intensity_final
+
+        return result
 
     def process_dataset(self, dataset: DataSet):
         print("Processing new dataset")
@@ -178,84 +261,35 @@ class Controller:
                                     dataset.range_selection)
             dataset.jar_file = jar_file
 
+
         dataset_labels = []
+        ys = []
+        for file in dataset.files:
+            dataset_labels.extend(file.labels())
 
-        # Process data
-        for file_index, file in enumerate(dataset.files):
-            print(f"Processing file {file_index}")
+            ys = np.vstack([file.ys for file in dataset.files])
 
-            ys_ranged = []
-            ys_jar_corrected = []
-            ys_jar_scaled = []
-            jar_scaling_factors = []
-            ys_background_corrected = []
-            ys_background_baseline = []
-            ys_normalized = []
-            ys_grounded = []
-            ys_result = []
+        if self.settings.parallel.enable:
+            nr_cores = int(self.settings.parallel.cores) if self.settings.parallel.cores != "auto" else cpu_count()-1
 
-            file.x_ranged = dataset.x_ranged
+            print("Processing data...")
 
-            for column_index, intensity in enumerate(file.ys):
-                print(f"Processing column {column_index} of file {file_index}")
-                # Apply x-limits to intensity values
-                intensity_ranged, _ = apply_limits(intensity, selection=dataset.range_selection)
-                ys_ranged.append(intensity_ranged)
+            with Pool(nr_cores) as pool:
+                # args = [(intensity, dataset.x_ranged, dataset.range_selection, self.settings, self.bkg_params) for intensity in ys]
+                settings_dict = dictify(self.settings)
+                args = [(intensity, dataset.x_ranged, dataset.range_selection, jar_file, settings_dict, self.bkg_params, label) for intensity, label in zip(ys, dataset_labels)]
 
-                # Apply jar-correction to intensity
-                intensity_pre_bkg = intensity_ranged
-                if self.settings.jar.enable:
-                    intensity_jar_corrected, jar_intensity_scaled, jar_scaling_factor = jar.jar_correct(jar_file,
-                                                                                                        intensity_ranged,
-                                                                                                        **self.bkg_params)
-
-                    ys_jar_corrected.append(intensity_jar_corrected)
-                    ys_jar_scaled.append(jar_intensity_scaled)
-                    jar_scaling_factors.append(jar_scaling_factor)
-
-                    intensity_pre_bkg = intensity_jar_corrected
-
-                # Perform background correction on prepared intensity data
-                intensity_pre_ground = intensity_pre_bkg
-                baseline = []
-                if self.settings.baseline.enable:
-                    intensity_corrected, baseline = algorithm.correct(intensity_pre_bkg, **self.bkg_params)
-                    ys_background_corrected.append(intensity_corrected)
-                    ys_background_baseline.append(baseline)
-
-                    intensity_pre_ground = intensity_corrected
-
-                # Ground processed intensity data
-                intensity_pre_norm = intensity_pre_ground
-                if self.settings.normalization.ground:
-                    intensity_grounded = ground(intensity_pre_ground)
-                    ys_grounded.append(intensity_grounded)
-
-                    intensity_pre_norm = intensity_grounded
-
-                # Normalize processed intensity data
-                intensity_final = intensity_pre_norm
-                if self.settings.normalization.area:
-                    intensity_normalized = normalize_area(x=dataset.x_ranged, y=intensity_pre_norm)
-                    ys_normalized.append(intensity_normalized)
-
-                    intensity_final = intensity_normalized
-                elif self.settings.normalization.sum:
-                    intensity_normalized = normalize_sum(intensity_pre_norm)
-                    ys_normalized.append(intensity_normalized)
-
-                    intensity_final = intensity_normalized
-                elif self.settings.normalization.max:
-                    intensity_normalized = normalize_max(intensity_pre_norm)
-                    ys_normalized.append(intensity_normalized)
-
-                    intensity_final = intensity_normalized
-
-                ys_result.append(intensity_final)
-                dataset_labels.append(f"{file.filename} [{column_index}]")
+                size = len(ys)
+                results = pool.starmap(process_parallel, loading_bar(args, total=size))
+        else:
+            results = []
+            for column_index, (intensity, label) in enumerate(zip(ys, dataset_labels)):
+                print(f"Processing column {column_index} of file {os.path.basename(file.filename)}")
+                result = self.process(intensity, dataset, jar_file)
+                result.label = label
 
                 # Plot data for first sample in first file
-                if [file_index, column_index] in self.settings.baseline.plot.test_datasets:
+                if column_index in self.settings.baseline.plot.test_datasets:
                     if self.settings.jar.plot.enable and self.settings.jar.enable:
                         if self.settings.jar.plot.jar_original:
                             plt.plot(dataset.x_ranged, jar_file.ys[0], label="Jar Intensity (Original)")
@@ -268,55 +302,45 @@ class Controller:
                             plt.plot(jar_file.x_ranged, jar_file.ys_background_corrected[0],
                                      label="Jar Intensity (Corrected, Ranged)")
                         if self.settings.jar.plot.jar_scaled:
-                            plt.plot(dataset.x_ranged, jar_intensity_scaled, label="Jar Intensity (Corrected, Scaled)")
+                            plt.plot(dataset.x_ranged, result.y_jar_scaled, label="Jar Intensity (Corrected, Scaled)")
                         if self.settings.jar.plot.intensity_original:
-                            plt.plot(dataset.x_ranged, intensity_ranged, label="Intensity (Pre-Jar-Correction)")
+                            plt.plot(dataset.x_ranged, result.y_ranged, label="Intensity (Pre-Jar-Correction)")
                         if self.settings.jar.plot.intensity_corrected:
-                            plt.plot(dataset.x_ranged, intensity_jar_corrected, label="Intensity (Jar-Corrected)")
+                            plt.plot(dataset.x_ranged, result.y_jar_corrected, label="Intensity (Jar-Corrected)")
 
                         plt.xlabel("x")
                         plt.ylabel("intensity")
                         plt.legend(loc="upper right")
-                        plt.title(f"file {file_index}, column {column_index}")
+                        plt.title(label + " (jar)")
 
                         plt.show()
 
                     if self.settings.baseline.plot.enable and self.settings.baseline.enable:
-                        intensity_ranged_plot = intensity_ranged if not self.settings.jar.enable else intensity_jar_corrected
+                        intensity_ranged_plot = result.y_ranged if not self.settings.jar.enable else result.y_jar_corrected
                         intensity_original_label = "Intensity (Original)" if not self.settings.jar.enable else "Intensity (Jar-Corrected)"
 
                         if self.settings.baseline.plot.original:
                             plt.plot(dataset.x_ranged, intensity_ranged_plot, label=intensity_original_label)
                         if self.settings.baseline.plot.baseline:
-                            plt.plot(dataset.x_ranged, baseline, label="Baseline")
+                            plt.plot(dataset.x_ranged, result.y_background_baseline, label="Baseline")
                         if self.settings.baseline.plot.corrected:
-                            plt.plot(dataset.x_ranged, intensity_pre_norm, label="Intensity (Corrected)")
+                            plt.plot(dataset.x_ranged, result.y_background_corrected, label="Intensity (Corrected)")
                         if self.settings.baseline.plot.corrected_normalized:
-                            plt.plot(dataset.x_ranged, intensity_final, label="Intensity (Corrected, Normalized")
+                            plt.plot(dataset.x_ranged, result.y_result, label="Intensity (Corrected, Normalized")
 
                         plt.xlabel("x")
                         plt.ylabel("intensity")
                         plt.legend(loc="upper right")
-                        plt.title(f"file {file_index}, column {column_index}")
+                        plt.title(label)
 
                         plt.show()
 
-            # Join column data per-file
-            file.ys_ranged = np.array(ys_ranged)
-            file.ys_jar_corrected = np.array(ys_jar_corrected)
-            file.jar_scaling_factors = np.array(jar_scaling_factors)
-            file.ys_background_corrected = np.array(ys_background_corrected)
-            file.ys_background_baseline = np.array(ys_background_baseline)
-            file.ys_grounded = np.array(ys_grounded)
-            file.ys_normalized = np.array(ys_normalized)
-
-            file.ys_result = np.array(ys_result)
-            file.x_result = dataset.x_ranged
+                results.append(result)
 
         # Join results of individual files into single array
-        dataset.x_result = dataset.files[0].x_result if len(dataset.files) != 0 else None
-        dataset.ys_result = np.vstack([file.ys_result for file in dataset.files])
-        dataset.ys_jar = np.vstack([file.ys_jar_corrected for file in dataset.files])
+        dataset.x_result = dataset.x_ranged
+        dataset.ys_result = np.vstack([result.y_result for result in results])
+        dataset.ys_jar = np.vstack([result.y_jar_corrected for result in results])
 
         base_dir = dataset.base_dir() if not os.path.isabs(self.settings.io.out_dir) else ""
         baseline_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.baseline.out_dir)

@@ -1,9 +1,11 @@
 import os.path
 import json
 
-from BackgroundCorrection.util import DDict
-
 defaults = {
+    "parallel": {
+        "enable": True,
+        "cores": "auto"
+    },
     "io": {
         "out_dir": "out",
         "dat_file_sep": '\t',
@@ -28,8 +30,7 @@ defaults = {
             "baseline": True,
             "corrected": True,
             "corrected_normalized": False,
-            "test_datasets": [
-                [0, 0],  # First number is file index, second number is column index within specified file
+            "test_datasets": [  # Indices of dataset you want to plot
             ]
         }
     },
@@ -50,6 +51,12 @@ defaults = {
             "intensity_corrected": True
         }
     },
+    "normalization": {
+        "area": True,
+        "sum": False,
+        "max": False,
+        "ground": False,
+    },
     "rois": {
         "enable": False,
         "ranges": [
@@ -65,12 +72,6 @@ defaults = {
             "ratio": [6, 2]
         }
     },
-    "normalization": {
-        "area": True,
-        "sum": False,
-        "max": False,
-        "ground": False,
-    },
     "plot": {
         "enable": True,
         "time_step": 1,
@@ -84,6 +85,7 @@ defaults = {
         "colorbar": False
     }
 }
+from BackgroundCorrection.util import DDict
 
 
 def write_settings(settings: dict, filename: str = "settings.json"):

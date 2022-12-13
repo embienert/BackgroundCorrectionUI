@@ -34,6 +34,11 @@ class DataFile:
         self.x_result = np.array([])
         self.ys_result = np.array([])
 
+    def labels(self):
+        basename = os.path.basename(self.filename)
+
+        return [f"{basename} [{i+1}]" for i in range(self.ys.shape[0])]
+
     def write_dat(self, out_dir: str, sep: str):
         head = self.head if self.head is not None else []
         data = np.concatenate((self.x_result.reshape(1, -1), self.ys_result)).T

@@ -10,6 +10,16 @@ class DDict(dict):
     __delattr__ = dict.__delitem__
 
 
+def dictify(d):
+    cpy = {}
+    for key, value in d.items():
+        if isinstance(value, DDict):
+            cpy[key] = dictify(value)
+        else:
+            cpy[key] = value
+    return cpy
+
+
 def apply_limits(data: np.ndarray, selection_range: Optional[Tuple[float, float]] = None, selection=None):
     if selection is None:
         selection_min, selection_max = selection_range
