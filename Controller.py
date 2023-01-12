@@ -11,6 +11,7 @@ import os
 
 import BackgroundCorrection.algorithm as algorithm
 import BackgroundCorrection.reader as reader
+import settings
 from BackgroundCorrection import jar
 from BackgroundCorrection.parallel import process_parallel
 from BackgroundCorrection.roi_integration import get_area, export_rois
@@ -136,7 +137,7 @@ class Controller:
         dataFiles = reader.read_many(files, self.settings.io.head_row_count)
         self.files = dataFiles
 
-    def extend_headers(self):
+    def extend_headers_legacy(self):
         params = {
             "algorithm": algorithm.algorithm_by_index(self.settings.baseline.algorithm).__name__,
             "itermax": self.settings.baseline.itermax,
@@ -146,6 +147,23 @@ class Controller:
 
         for file in self.files:
             file.extend_head(__version__, **params)
+
+    def extend_headers(self):
+        # out = []
+        # for row in self.settings.io.header_data:
+        #     out_row = ""
+        #     for entry in row:
+        #         out_row += settings.option_to_str(self.settings, entry)
+        #     out.append(out_row)
+
+        header_extension = [
+            ", ".join(map(lambda entry: settings.option_to_str(self.settings, entry), row)) for row in self.settings.io.header_data
+        ]
+
+        for file in self.files:
+            file.extend_head(__version__, header_extension)
+
+
 
     def process(self, intensity, dataset, jar_file=None):
         result = ProcessingResult()
@@ -250,6 +268,7 @@ class Controller:
 
         # TODO: Option to use same jar for every dataset
         # Prepare jar-correction
+        jar_file = None
         if self.settings.jar.enable:
             print("Loading reference file")
             root = Tk()

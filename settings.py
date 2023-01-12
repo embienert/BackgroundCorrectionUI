@@ -1,6 +1,9 @@
 import os.path
 import json
 
+
+_NOT_ENABLED_DEFAULT = "N/A"
+
 defaults = {
     "parallel": {
         "enable": True,
@@ -9,7 +12,10 @@ defaults = {
     "io": {
         "out_dir": "out",
         "dat_file_sep": '\t',
-        "head_row_count": 0
+        "head_row_count": 0,
+        "header_data": [
+            ("baseline.algorithm", "baseline.itermax", "baseline.lam", "baseline.ratio", ),
+        ]
     },
     "data": {
         "range_start": -(2 ** 32 - 1),
@@ -121,3 +127,21 @@ def _overwrite_settings(settings: dict, other_settings: dict) -> DDict:
             settings[key] = other_settings[key]
 
     return DDict(settings)
+
+
+def option_to_str(settings: DDict, key: str):
+    if "enable" in settings.keys() and "enable" not in key and not settings["enable"]:
+        return _NOT_ENABLED_DEFAULT
+
+    key_split = key.split(".", maxsplit=1)
+
+    if len(key_split) == 1:
+        base_key = key_split[0]
+        select = settings[base_key]
+
+        return str(select)
+
+    base_key, residual_key = key_split
+    select = settings[base_key]
+
+    return key + "=" + option_to_str(select, residual_key)

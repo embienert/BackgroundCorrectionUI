@@ -54,10 +54,18 @@ class DataFile:
         # TODO: Change to logging
         print(f"Wrote data to {out_dir}")
 
-    def extend_head(self, script_version: str, **params):
+    def extend_head_legacy(self, script_version: str, **params):
         head_extension = [
             f"BackgroundCorrection.py (Version {script_version})",
             "".join([f", {param_name} = {param_value}" for param_name, param_value in params.items()])[2:]
+        ]
+
+        self.head = [*head_extension, *self.head]
+
+    def extend_head(self, script_version: str, data_rows: List[str]):
+        head_extension = [
+            f"BackgroundCorrection.py (Version {script_version})",
+            *data_rows
         ]
 
         self.head = [*head_extension, *self.head]
