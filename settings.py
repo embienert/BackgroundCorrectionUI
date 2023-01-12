@@ -1,7 +1,6 @@
 import os.path
 import json
 
-
 _NOT_ENABLED_DEFAULT = "N/A"
 
 defaults = {
@@ -14,7 +13,7 @@ defaults = {
         "dat_file_sep": '\t',
         "head_row_count": 0,
         "header_data": [
-            ("baseline.algorithm", "baseline.itermax", "baseline.lam", "baseline.ratio", ),
+            ("baseline.algorithm", "baseline.itermax", "baseline.lam", "baseline.ratio",),
         ]
     },
     "data": {
@@ -37,6 +36,7 @@ defaults = {
             "corrected": True,
             "corrected_normalized": False,
             "test_datasets": [  # Indices of dataset you want to plot
+                10
             ]
         }
     },
@@ -124,7 +124,8 @@ def _overwrite_settings(settings: dict, other_settings: dict) -> DDict:
                 settings[key] = _overwrite_settings(value, value)
 
         if key in other_settings.keys() and not isinstance(other_settings[key], dict):
-            settings[key] = other_settings[key]
+            if type(other_settings[key]) == type(settings[key]):
+                settings[key] = other_settings[key]
 
     return DDict(settings)
 
