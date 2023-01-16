@@ -124,8 +124,7 @@ def _overwrite_settings(settings: dict, other_settings: dict) -> DDict:
                 settings[key] = _overwrite_settings(value, value)
 
         if key in other_settings.keys() and not isinstance(other_settings[key], dict):
-            if type(other_settings[key]) == type(settings[key]):
-                settings[key] = other_settings[key]
+            settings[key] = other_settings[key]
 
     return DDict(settings)
 
