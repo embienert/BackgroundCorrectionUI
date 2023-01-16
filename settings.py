@@ -1,8 +1,6 @@
 import os.path
 import json
 
-_NOT_ENABLED_DEFAULT = "N/A"
-
 defaults = {
     "parallel": {
         "enable": True,
@@ -12,9 +10,17 @@ defaults = {
         "out_dir": "out",
         "dat_file_sep": '\t',
         "head_row_count": 0,
-        "header_data": [
-            ("baseline.algorithm", "baseline.itermax", "baseline.lam", "baseline.ratio",),
-        ]
+        "header": {
+            "baseline_params": True,
+            "jar_params": True,
+            "roi_params": True,
+            "normalization": True,
+            "additional": [
+                "plot.time_step",
+                "plot.x_unit",
+                "plot.y_unit",
+            ]
+        }
     },
     "data": {
         "range_start": -(2 ** 32 - 1),
@@ -91,6 +97,8 @@ defaults = {
         "colorbar": False
     }
 }
+_NOT_ENABLED_DEFAULT = "N/A"
+
 from BackgroundCorrection.util import DDict
 
 
@@ -138,6 +146,9 @@ def option_to_str(settings: DDict, key: str):
     if len(key_split) == 1:
         base_key = key_split[0]
         select = settings[base_key]
+
+        if isinstance(select, str):
+            select = f"\"{select}\""
 
         return str(select)
 

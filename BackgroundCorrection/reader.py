@@ -11,6 +11,7 @@ import os.path
 class DataFile:
     def __init__(self, filename: str, content: np.ndarray, head: List[str]):
         self.filename: str = filename
+        self.basename: str = os.path.basename(filename)
 
         self.data: np.ndarray = content
         self.head: List[str] = head
@@ -62,12 +63,7 @@ class DataFile:
 
         self.head = [*head_extension, *self.head]
 
-    def extend_head(self, script_version: str, data_rows: List[str]):
-        head_extension = [
-            f"BackgroundCorrection.py (Version {script_version})",
-            *data_rows
-        ]
-
+    def extend_head(self, head_extension: List[str]):
         self.head = [*head_extension, *self.head]
 
 

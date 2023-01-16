@@ -1,4 +1,4 @@
-__version__ = "0.3.2 alpha"
+__version__ = "0.4.0 alpha"
 
 from multiprocessing import Pool, cpu_count
 from tkinter.filedialog import askopenfilenames, askopenfilename, askdirectory
@@ -22,6 +22,9 @@ from BackgroundCorrection.util import apply_limits, normalize_area, normalize_ma
 from settings import load_settings
 
 from tqdm import tqdm as loading_bar
+
+import warnings
+warnings.filterwarnings("ignore")
 
 matplotlib.use("QtAgg")
 
@@ -148,20 +151,55 @@ class Controller:
         for file in self.files:
             file.extend_head(__version__, **params)
 
-    def extend_headers(self):
-        # out = []
-        # for row in self.settings.io.header_data:
-        #     out_row = ""
-        #     for entry in row:
-        #         out_row += settings.option_to_str(self.settings, entry)
-        #     out.append(out_row)
+    def extend_headers(self, dataset: DataSet):
+        general_row = {k: v for k, v in {
+                "script_version": f"\"{__version__}\"",
+                "first_file": f"\"{dataset.files[0].basename}\"" if len(dataset.files) > 1 else None,
+                "last_file": f"\"{dataset.files[-1].basename}\"" if len(dataset.files) > 1 else None,
+                "file": f"\"{dataset.files[0].basename}\"" if len(dataset.files) == 1 else None,
+                "jar_file": f"\"{dataset.jar_file.basename}\"" if dataset.jar_file else None
+            }.items() if v is not None
+        }
+        baseline_row = {
+            "baseline_algorithm": f"\"{algorithm.algorithm_by_index(self.settings.baseline.algorithm).__name__}\"",
+            "baseline_itermax": self.settings.baseline.itermax,
+            "baseline_lambda": self.settings.baseline.lam,
+            "baseline_ratio": self.settings.baseline.ratio
+        }
+        jar_row = {
+            "jar_range_start": self.settings.jar.range_start,
+            "jar_range_stop": self.settings.jar.range_stop
+        }
+        roi_row = {
+            "roi_ranges": list(map(lambda x: x[:2], self.settings.rois.ranges)),
+            "roi_normalization": f'\"{",".join(np.array(["sum", "sum_linear", "max"])[[value for key, value in self.settings.rois.normalize.items()]])}\"'
+        }
+        normalization_row = {
+            "normalization": f'\"{",".join(np.array(["area", "sum", "max"])[[value for key, value in self.settings.normalization.items()][:3]])}\"',
+            "ground": self.settings.normalization.ground
+        }
 
-        header_extension = [
-            ", ".join(map(lambda entry: settings.option_to_str(self.settings, entry), row)) for row in self.settings.io.header_data
-        ]
+        if roi_row["roi_normalization"] == '""':
+            roi_row["roi_normalization"] = "none"
+        if normalization_row["normalization"] == '""':
+            normalization_row["normalization"] = "none"
+
+        header_extension = list(filter(lambda x: x is not None, [
+            ", ".join(f"{key}={value}" for key, value in general_row.items()),
+            ", ".join(f"{key}={value}" for key, value in
+                      baseline_row.items()) if self.settings.io.header.baseline_params and self.settings.baseline.enable else None,
+            ", ".join(f"{key}={value}" for key, value in
+                      jar_row.items()) if self.settings.io.header.jar_params and self.settings.jar.enable else None,
+            ", ".join(f"{key}={value}" for key, value in
+                      roi_row.items()) if self.settings.io.header.roi_params and self.settings.rois.enable else None,
+            ", ".join(f"{key}={value}" for key, value in
+                      normalization_row.items()) if self.settings.io.header.normalization else None,
+            ", ".join(settings.option_to_str(self.settings, key) for key in self.settings.io.header.additional) if len(self.settings.io.header.additional) > 0 else None
+        ]))
+
 
         for file in self.files:
-            file.extend_head(__version__, header_extension)
+            file.extend_head(header_extension)
 
 
 
@@ -367,6 +405,8 @@ class Controller:
         if not os.path.exists(baseline_out_dir):
             os.mkdir(baseline_out_dir)
 
+        self.extend_headers(dataset)
+
         # Write final results to output file
         if self.settings.baseline.enable:
             dataset.export_baseline(baseline_out_dir, sep=self.settings.io.dat_file_sep)
@@ -492,7 +532,6 @@ class Controller:
     def run(self):
         # Load files and extend headers with parameters specified in settings
         self.load_files()
-        self.extend_headers()
 
         dataset = DataSet(self.files)
 
