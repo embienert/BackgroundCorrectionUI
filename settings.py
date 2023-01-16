@@ -7,7 +7,7 @@ defaults = {
         "cores": "auto"
     },
     "io": {
-        "out_dir": "out",
+        "out_dir": "bkgcorr",
         "dat_file_sep": '\t',
         "head_row_count": 0,
         "header": {
@@ -51,7 +51,7 @@ defaults = {
         "range_start": -(2 ** 32 - 1),
         "range_stop": 2 ** 32 - 1,
         "reference_file_head_row_count": 0,
-        "out_dir": "jar",
+        "out_dir": "jarcorr",
         "plot": {
             "enable": True,
             "jar_original": False,

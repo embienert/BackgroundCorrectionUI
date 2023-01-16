@@ -1,4 +1,4 @@
-__version__ = "0.4.0 alpha"
+__version__ = "0.4.1 alpha"
 
 from multiprocessing import Pool, cpu_count
 from tkinter.filedialog import askopenfilenames, askopenfilename, askdirectory
