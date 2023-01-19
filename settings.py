@@ -1,6 +1,8 @@
 import os.path
 import json
 
+BASE_PATH = os.path.dirname(os.path.realpath(__file__))
+
 defaults = {
     "parallel": {
         "enable": True,
@@ -102,12 +104,18 @@ _NOT_ENABLED_DEFAULT = "N/A"
 from BackgroundCorrection.util import DDict
 
 
-def write_settings(settings: dict, filename: str = "settings.json"):
+def write_settings(settings: dict, filename=None):
+    if not filename:
+        filename = os.path.join(BASE_PATH, "settings.json")
+
     with open(filename, "w+") as out_stream:
         json.dump(settings, out_stream, indent=4)
 
 
-def load_settings(filename: str = "settings.json") -> DDict:
+def load_settings(filename=None) -> DDict:
+    if not filename:
+        filename = os.path.join(BASE_PATH, "settings.json")
+
     if not os.path.exists(filename):
         write_settings(defaults, filename)
 
