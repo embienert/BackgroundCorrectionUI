@@ -1,4 +1,4 @@
-import multiprocessing
+import matplotlib.pyplot as plt
 import numpy as np
 
 from BackgroundCorrection import jar, algorithm
@@ -24,7 +24,7 @@ class ProcessingResult:
         self.label = ""
 
 
-def process_parallel(intensity, x_ranged, range_selection, jar_file, settings, bkg_params, label):
+def process_parallel(intensity, x_ranged, range_selection, jar_file, settings, bkg_params, label, plot=False):
     result = ProcessingResult()
     result.label = label
 
@@ -84,5 +84,50 @@ def process_parallel(intensity, x_ranged, range_selection, jar_file, settings, b
     result.y_result = intensity_final
 
     # print(f"Processed {label}")
+    if plot:
+        if settings["jar"]["plot"]["enable"] and settings["jar"]["enable"]:
+            if settings["jar"]["plot"]["jar_original"]:
+                plt.plot(x_ranged, jar_file.ys[0], label="Jar Intensity (Original)")
+            if settings["jar"]["plot"]["jar_ranged"]:
+                plt.plot(jar_file.x_ranged, jar_file.ys_ranged[0], label="Jar Intensity (Ranged)")
+            if settings["jar"]["plot"]["jar_baseline"]:
+                plt.plot(jar_file.x_ranged, jar_file.ys_background_baseline[0],
+                         label="Jar Baseline (Ranged)")
+            if settings["jar"]["plot"]["jar_corrected"]:
+                plt.plot(jar_file.x_ranged, jar_file.ys_background_corrected[0],
+                         label="Jar Intensity (Corrected, Ranged)")
+            if settings["jar"]["plot"]["jar_scaled"]:
+                plt.plot(x_ranged, result.y_jar_scaled, label="Jar Intensity (Corrected, Scaled)")
+            if settings["jar"]["plot"]["intensity_original"]:
+                plt.plot(x_ranged, result.y_ranged, label="Intensity (Pre-Jar-Correction)")
+            if settings["jar"]["plot"]["intensity_corrected"]:
+                plt.plot(x_ranged, result.y_jar_corrected, label="Intensity (Jar-Corrected)")
+
+            plt.xlabel("x")
+            plt.ylabel("intensity")
+            plt.legend(loc="upper right")
+            plt.title(label + " (jar)")
+
+            plt.show()
+
+        if settings["baseline"]["plot"]["enable"] and settings["baseline"]["enable"]:
+            intensity_ranged_plot = result.y_ranged if not settings["jar"]["enable"] else result.y_jar_corrected
+            intensity_original_label = "Intensity (Original)" if not settings["jar"]["enable"] else "Intensity (Jar-Corrected)"
+
+            if settings["baseline"]["plot"]["original"]:
+                plt.plot(x_ranged, intensity_ranged_plot, label=intensity_original_label)
+            if settings["baseline"]["plot"]["baseline"]:
+                plt.plot(x_ranged, result.y_background_baseline, label="Baseline")
+            if settings["baseline"]["plot"]["corrected"]:
+                plt.plot(x_ranged, result.y_background_corrected, label="Intensity (Corrected)")
+            if settings["baseline"]["plot"]["corrected_normalized"]:
+                plt.plot(x_ranged, result.y_result, label="Intensity (Corrected, Normalized")
+
+            plt.xlabel("x")
+            plt.ylabel("intensity")
+            plt.legend(loc="upper right")
+            plt.title(label)
+
+            plt.show()
 
     return result

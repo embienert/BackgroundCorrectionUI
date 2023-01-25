@@ -1,4 +1,4 @@
-__version__ = "0.4.2 alpha"
+__version__ = "0.4.3 alpha"
 
 from multiprocessing import Pool, cpu_count
 from tkinter.filedialog import askopenfilenames, askopenfilename, askdirectory
@@ -334,7 +334,17 @@ class Controller:
             with Pool(nr_cores) as pool:
                 # args = [(intensity, dataset.x_ranged, dataset.range_selection, self.settings, self.bkg_params) for intensity in ys]
                 settings_dict = dictify(self.settings)
-                args = [(intensity, dataset.x_ranged, dataset.range_selection, jar_file, settings_dict, self.bkg_params, label) for intensity, label in zip(ys, dataset_labels)]
+                args = [
+                    (
+                        intensity,
+                        dataset.x_ranged,
+                        dataset.range_selection,
+                        jar_file, settings_dict,
+                        self.bkg_params,
+                        label,
+                        index in self.settings.baseline.plot.test_datasets
+                    ) for index, (intensity, label) in enumerate(zip(ys, dataset_labels))
+                ]
 
                 size = len(ys)
                 results = pool.starmap(process_parallel, loading_bar(args, total=size))

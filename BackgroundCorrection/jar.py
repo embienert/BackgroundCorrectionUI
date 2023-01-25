@@ -31,17 +31,18 @@ def jar_correct(jar_file: DataFile, intensity: np.ndarray, **opt):
     jar_intensity = jar_file.ys[0]
     jar_selection = jar_file.range_selection
 
-    data_ranged = intensity[jar_selection]
-
     jar_ranged_corrected = jar_file.ys_background_corrected
 
     if jar_ranged_corrected.size == 0:
-        jar_ranged_corrected, jar_ranged_baseline = algorithm.correct(jar_file.ys_ranged[0], **opt)
+        jar_corrected, jar_baseline = algorithm.correct(jar_file.ys[0], **opt)
+
+        jar_ranged_corrected = jar_corrected[jar_selection]
 
         jar_file.ys_background_corrected = np.array([jar_ranged_corrected])
-        jar_file.ys_background_baseline = np.array([jar_ranged_baseline])
+        jar_file.ys_background_baseline = np.array([jar_baseline])
 
-    data_ranged_corrected, data_ranged_baseline = algorithm.correct(data_ranged, **opt)
+    data_corrected, data_baseline = algorithm.correct(intensity, **opt)
+    data_ranged_corrected = data_corrected[jar_selection]
 
     scaling_factor, _, _, _ = np.linalg.lstsq(jar_ranged_corrected.reshape(-1, 1), data_ranged_corrected, rcond=None)
     jar_intensity_scaled = scaling_factor * jar_intensity
