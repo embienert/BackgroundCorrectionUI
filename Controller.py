@@ -1,4 +1,4 @@
-__version__ = "0.4.3 alpha"
+__version__ = "0.4.4 alpha"
 
 from multiprocessing import Pool, cpu_count
 from tkinter.filedialog import askopenfilenames, askopenfilename, askdirectory
@@ -26,7 +26,10 @@ from tqdm import tqdm as loading_bar
 import warnings
 warnings.filterwarnings("ignore")
 
-matplotlib.use("QtAgg")
+try:
+    matplotlib.use("QtAgg")
+except ValueError:
+    matplotlib.use("Qt5Agg")
 
 READFILE_TYPES = [
     ("Raman Files", ".txt .raman"),
