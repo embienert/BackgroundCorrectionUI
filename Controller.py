@@ -143,6 +143,8 @@ class Controller:
         dataFiles = reader.read_many(files, self.settings.io.head_row_count)
         self.files = dataFiles
 
+        print(f"Read files: [{', '.join([dataFile.file() for dataFile in dataFiles])}]")
+
     def extend_headers_legacy(self):
         params = {
             "algorithm": algorithm.algorithm_by_index(self.settings.baseline.algorithm).__name__,
@@ -321,6 +323,8 @@ class Controller:
                                     dataset.range_selection)
             dataset.jar_file = jar_file
 
+            print(f"Loaded jar file: {jar_file.file()}")
+
 
         dataset_labels = []
         ys = []
@@ -497,7 +501,8 @@ class Controller:
             # Write ROI integration data to output file
             rois_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.rois.out_dir)
             export_rois(dataset.roi_values_normalized, dataset_labels,
-                        self.settings.rois.ranges, rois_out_dir, dataset.dataset_name)
+                        self.settings.rois.ranges, rois_out_dir, dataset.dataset_name,
+                        time_step=self.settings.plot.time_step, time_unit=self.settings.plot.y_unit)
 
             # Plot ROI integration data
             if self.settings.rois.plot.enable:

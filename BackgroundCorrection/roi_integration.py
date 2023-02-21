@@ -60,11 +60,16 @@ def normalize_max(roi_areas):
     return roi_areas_scaled, 0
 
 
-def export_rois(rois_values, filenames, rois_ranges, out_dir, name: str = ""):
+def export_rois(rois_values, filenames, rois_ranges, out_dir, name: str = "", time_step: float = 1, time_unit: str = "s"):
     header = ",".join(["filename",
                        *[f"roi_{i}[{str(float(start)) + '_to_' + str(float(stop))}]" for i, (start, stop, color) in
                          enumerate(rois_ranges)]])
-    export_data = np.concatenate((np.array(filenames, dtype=object).reshape(1, -1), rois_values)).T
+
+    times = np.arange(0, rois_values.shape[1] * time_step, time_step)
+
+    export_data = np.concatenate((np.array(list(map(lambda t: f"{t}{time_unit}", times)), dtype=object).reshape(1, -1),
+                                  np.array(filenames, dtype=object).reshape(1, -1),
+                                  rois_values)).T
 
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)

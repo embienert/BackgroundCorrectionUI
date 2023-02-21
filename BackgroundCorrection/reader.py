@@ -15,6 +15,8 @@ class DataFile:
 
         self.data: np.ndarray = content
         self.head: List[str] = head
+        self.times: List[float] = []
+        self.time_unit = ""
 
         self.x = np.copy(self.data[0]) if self.data.size != 0 else np.array([])
         self.ys = np.copy(self.data[1:]) if self.data.size != 0 else np.array([])
@@ -38,10 +40,21 @@ class DataFile:
     def labels(self):
         basename = os.path.basename(self.filename)
 
-        return [f"{basename} [{i+1}]" for i in range(self.ys.shape[0])]
+        return [f"{basename}[{i+1}]" for i in range(self.ys.shape[0])]
+
+    def set_time_step(self, time_step, unit: str):
+        self.times = np.arange(0, self.ys_result.shape[0] * time_step, time_step)
+        self.time_unit = unit
 
     def write_dat(self, out_dir: str, sep: str):
         head = self.head if self.head is not None else []
+        if self.times:
+            # Add another "header" row containing time column labels
+            head = [*head, "x" + sep + sep.join(map(lambda t: f"{t}{self.time_unit}", self.times))]
+        else:
+            # Add another "header" row containing column labels (numbers 1..#Enries)
+            head = [*head, "x" + sep + sep.join(map(str, np.arange(0, self.ys_result.shape[0], self.ys_result.shape[0]) + 1))]
+
         data = np.concatenate((self.x_result.reshape(1, -1), self.ys_result)).T
 
         # Join all columns to rows
@@ -65,6 +78,9 @@ class DataFile:
 
     def extend_head(self, head_extension: List[str]):
         self.head = [*head_extension, *self.head]
+
+    def file(self) -> str:
+        return str(os.path.basename(self.filename))
 
 
 def read_raman(filename: str, head_rows: int) -> (np.ndarray, List[str], List[str]):
