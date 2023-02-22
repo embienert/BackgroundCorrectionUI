@@ -64,7 +64,7 @@ def normalize_max(roi_areas):
 
 
 def export_rois(rois_values, filenames, rois_ranges, out_dir, name: str = "", time_step: float = 1, time_unit: str = "s"):
-    header = ",".join(["filename",
+    header = ",".join(["time", "filename",
                        *[f"roi_{i}[{str(float(start)) + '_to_' + str(float(stop))}]" for i, (start, stop, color) in
                          enumerate(rois_ranges)]])
 
