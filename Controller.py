@@ -1,4 +1,4 @@
-__version__ = "0.5.1 alpha"
+__version__ = "0.5.2 alpha"
 
 from multiprocessing import Pool, cpu_count
 from tkinter.filedialog import askopenfilenames, askopenfilename, askdirectory
@@ -177,7 +177,8 @@ class Controller:
         }
         roi_row = {
             "roi_ranges": list(map(lambda x: x[:2], self.settings.rois.ranges)),
-            "roi_normalization": f'\"{",".join(np.array(["sum", "sum_linear", "max"])[[value for key, value in self.settings.rois.normalize.items()]])}\"'
+            "roi_normalization": f'\"{",".join(np.array(["sum", "sum_linear", "max"])[[value for key, value in self.settings.rois.normalize.items()]])}\"',
+            "roi_selection": f'\"{",".join(np.array(["area", "max"])[[value for key, value in self.settings.rois.selection.items()]])}\"'
         }
         normalization_row = {
             "normalization": f'\"{",".join(np.array(["area", "sum", "max"])[[value for key, value in self.settings.normalization.items()][:3]])}\"',

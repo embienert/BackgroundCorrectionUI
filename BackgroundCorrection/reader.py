@@ -53,7 +53,8 @@ class DataFile:
             head = [*head, "x" + sep + sep.join(map(lambda t: f"{t}{self.time_unit}", self.times))]
         else:
             # Add another "header" row containing column labels (numbers 1..#Enries)
-            head = [*head, "x" + sep + sep.join(map(str, np.arange(0, self.ys_result.shape[0], 1) + 1))]
+            # head = [*head, "x" + sep + sep.join(map(str, np.arange(0, self.ys_result.shape[0], 1) + 1))]
+            pass
 
         data = np.concatenate((self.x_result.reshape(1, -1), self.ys_result)).T
 
