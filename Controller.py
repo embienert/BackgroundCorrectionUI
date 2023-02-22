@@ -483,8 +483,9 @@ class Controller:
                 flip_roi = False
 
             # Get ROI integration data on whole DataSet intensity
+            select_max = self.settings.rois.selection.max
             dataset.roi_values = np.array(
-                [[get_area(dataset.x_result, y_result, range_min, range_max, flip=flip_roi) for y_result in
+                [[get_area(dataset.x_result, y_result, range_min, range_max, flip=flip_roi, select_max=select_max) for y_result in
                   dataset.ys_result]
                  for (range_min, range_max, _) in self.settings.rois.ranges]
             )

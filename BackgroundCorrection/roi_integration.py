@@ -3,7 +3,7 @@ from scipy.optimize import lsq_linear
 import os
 
 
-def get_area(x, intensities, roi_min, roi_max, flip=False):
+def get_area(x, intensities, roi_min, roi_max, flip=False, select_max=False):
     selection = (x >= roi_min) & (x <= roi_max)
 
     x_ranged = x[selection]
@@ -13,9 +13,12 @@ def get_area(x, intensities, roi_min, roi_max, flip=False):
         x_ranged = np.flip(x_ranged)
         intensities_ranged = np.flip(intensities_ranged, axis=0)
 
-    y_area = np.trapz(x=x_ranged, y=intensities_ranged)
+    if not select_max:
+        value = np.trapz(x=x_ranged, y=intensities_ranged)
+    else:
+        value = np.max(intensities_ranged)
 
-    return y_area
+    return value
 
 
 def normalize_linear(roi_areas) -> (np.ndarray, float):

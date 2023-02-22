@@ -73,6 +73,10 @@ defaults = {
     },
     "rois": {
         "enable": False,
+        "selection": {
+            "area": True,
+            "max": False
+        },
         "ranges": [
         ],
         "out_dir": "",
