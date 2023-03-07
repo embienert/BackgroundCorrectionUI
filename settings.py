@@ -93,6 +93,8 @@ defaults = {
     "plot": {
         "enable": True,
         "time_step": 1,
+        "display_time_range_start": 0,
+        "display_time_range_stop": 2 ** 32 - 1,
         "flip_x_data": False,
         "flip_y_data": False,
         "flip_x_ticks": False,

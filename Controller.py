@@ -340,22 +340,28 @@ class Controller:
             print("Processing data...")
 
             with Pool(nr_cores) as pool:
-                # args = [(intensity, dataset.x_ranged, dataset.range_selection, self.settings, self.bkg_params) for intensity in ys]
-                settings_dict = dictify(self.settings)
-                args = [
-                    (
-                        intensity,
-                        dataset.x_ranged,
-                        dataset.range_selection,
-                        jar_file, settings_dict,
-                        self.bkg_params,
-                        label,
-                        index in self.settings.baseline.plot.test_datasets
-                    ) for index, (intensity, label) in enumerate(zip(ys, dataset_labels))
-                ]
+                try:
+                    # args = [(intensity, dataset.x_ranged, dataset.range_selection, self.settings, self.bkg_params) for intensity in ys]
+                    settings_dict = dictify(self.settings)
+                    args = [
+                        (
+                            intensity,
+                            dataset.x_ranged,
+                            dataset.range_selection,
+                            jar_file, settings_dict,
+                            self.bkg_params,
+                            label,
+                            index in self.settings.baseline.plot.test_datasets
+                        ) for index, (intensity, label) in enumerate(zip(ys, dataset_labels))
+                    ]
 
-                size = len(ys)
-                results = pool.starmap(process_parallel, loading_bar(args, total=size))
+                    size = len(ys)
+                    results = pool.starmap(process_parallel, loading_bar(args, total=size))
+                except KeyboardInterrupt:
+                    print("CTRL+C was pressed. Killing all processes.")
+
+                    pool.terminate()
+                    raise KeyboardInterrupt
         else:
             results = []
             for column_index, (intensity, label) in enumerate(zip(ys, dataset_labels)):
@@ -446,12 +452,18 @@ class Controller:
             # Plot result intensities
             y_scale = np.arange(0, dataset.ys_result.shape[0] * self.settings.plot.time_step,
                                 self.settings.plot.time_step)
+
+            time_range_selection = (self.settings.plot.display_time_range_start <= y_scale) & (y_scale <= self.settings.plot.display_time_range_stop)
+            y_scale = y_scale[time_range_selection]
+
             extent = [np.min(dataset.x_result), np.max(dataset.x_result), np.min(y_scale), np.max(y_scale)]
 
             if not self.settings.plot.flip_y_data:
-                img_data = np.flip(dataset.ys_result, axis=0)
+                # img_data = np.flip(dataset.ys_result, axis=0)
+                img_data = np.flip(dataset.ys_result, axis=0)[time_range_selection]
             else:
-                img_data = dataset.ys_result
+                # img_data = dataset.ys_result
+                img_data = dataset.ys_result[time_range_selection[::-1]]
 
             if self.settings.plot.flip_x_data:
                 img_data = np.flip(img_data, axis=1)
@@ -508,10 +520,12 @@ class Controller:
 
             # Plot ROI integration data
             if self.settings.rois.plot.enable:
+                roi_values_normalized_ranged = dataset.roi_values_normalized[:, time_range_selection]
+
                 if self.settings.plot.flip_y_data:
-                    rois_data = np.flip(dataset.roi_values_normalized, axis=1)
+                    rois_data = np.flip(roi_values_normalized_ranged, axis=1)
                 else:
-                    rois_data = dataset.roi_values_normalized
+                    rois_data = roi_values_normalized_ranged
 
                 if self.settings.plot.flip_y_ticks:
                     y_scale = np.flip(y_scale)
