@@ -1,4 +1,4 @@
-__version__ = "0.6.0 alpha"
+__version__ = "0.6.1 alpha"
 
 from multiprocessing import Pool, cpu_count
 from tkinter.filedialog import askopenfilenames, askopenfilename, askdirectory
@@ -451,10 +451,12 @@ class Controller:
 
             # Plot result intensities
             y_scale = np.arange(0, dataset.ys_result.shape[0] * self.settings.plot.time_step,
-                                self.settings.plot.time_step)
+                                self.settings.plot.time_step)[:dataset.ys_result.shape[0]]
 
             time_range_selection = (self.settings.plot.display_time_range_start <= y_scale) & (y_scale <= self.settings.plot.display_time_range_stop)
             y_scale = y_scale[time_range_selection]
+
+            print(dataset.x_result.shape, y_scale.shape)
 
             extent = [np.min(dataset.x_result), np.max(dataset.x_result), np.min(y_scale), np.max(y_scale)]
 

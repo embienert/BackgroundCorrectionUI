@@ -37,9 +37,10 @@ def jar_correct(jar_file: DataFile, intensity: np.ndarray, **opt):
         jar_corrected, jar_baseline = algorithm.correct(jar_file.ys[0], **opt)
 
         jar_ranged_corrected = jar_corrected[jar_selection]
+        jar_ranged_baseline = jar_baseline[jar_selection]
 
         jar_file.ys_background_corrected = np.array([jar_ranged_corrected])
-        jar_file.ys_background_baseline = np.array([jar_baseline])
+        jar_file.ys_background_baseline = np.array([jar_ranged_baseline])
 
     data_corrected, data_baseline = algorithm.correct(intensity, **opt)
     data_ranged_corrected = data_corrected[jar_selection]
