@@ -56,9 +56,16 @@ def normalize(roi_areas):
     return roi_areas_scaled, mean_error
 
 
-def normalize_max(roi_areas):
+def normalize_max_total(roi_areas):
     scaling_factor = 1 / np.max(roi_areas)
     roi_areas_scaled = roi_areas * scaling_factor
+
+    return roi_areas_scaled, 0
+
+
+def normalize_max(roi_areas):
+    scaling_factors = 1 / np.max(roi_areas, axis=1)
+    roi_areas_scaled = (scaling_factors * roi_areas.T).T
 
     return roi_areas_scaled, 0
 

@@ -2,8 +2,6 @@ import spc_spectra as spc
 import pandas as pd
 import numpy as np
 
-import pyspectra.readers.read_spc
-
 from typing import List
 import os.path
 

@@ -177,7 +177,7 @@ class Controller:
         }
         roi_row = {
             "roi_ranges": list(map(lambda x: x[:2], self.settings.rois.ranges)),
-            "roi_normalization": f'\"{",".join(np.array(["sum", "sum_linear", "max"])[[value for key, value in self.settings.rois.normalize.items()]])}\"',
+            "roi_normalization": f'\"{",".join(np.array(["sum", "sum_linear", "max_total", "max"])[[value for key, value in self.settings.rois.normalize.items()]])}\"',
             "roi_selection": f'\"{",".join(np.array(["area", "max"])[[value for key, value in self.settings.rois.selection.items()]])}\"'
         }
         normalization_row = {
@@ -509,6 +509,8 @@ class Controller:
                 dataset.roi_values_normalized, mean_error = roi_integration.normalize(dataset.roi_values)
             elif self.settings.rois.normalize.sum_linear:
                 dataset.roi_values_normalized, mean_error = roi_integration.normalize_linear(dataset.roi_values)
+            elif self.settings.rois.normalize.max_total:
+                dataset.roi_values_normalized, mean_error = roi_integration.normalize_max_total(dataset.roi_values)
             elif self.settings.rois.normalize.max:
                 dataset.roi_values_normalized, mean_error = roi_integration.normalize_max(dataset.roi_values)
             else:

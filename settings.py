@@ -83,6 +83,7 @@ defaults = {
         "normalize": {
             "sum": True,
             "sum_linear": False,
+            "max_total": False,  # Previously max
             "max": False,
         },
         "plot": {
