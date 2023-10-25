@@ -1,4 +1,4 @@
-__version__ = "0.7.0 alpha"
+__version__ = "0.7.1 alpha"
 
 from multiprocessing import Pool, cpu_count
 from tkinter.filedialog import askopenfilenames, askopenfilename, askdirectory
@@ -550,6 +550,8 @@ class Controller:
                     labelleft=False
                 )
                 ax_rois.set_xlabel("Norm. Intensity")
+
+                ax_rois.set_xlim(left=-0.1)
 
                 # Save figure to file
                 fig.tight_layout()
