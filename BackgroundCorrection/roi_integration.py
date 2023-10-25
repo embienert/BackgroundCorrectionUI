@@ -76,7 +76,7 @@ def export_rois(rois_values, filenames, rois_ranges, out_dir, name: str = "", ti
                        *[f"roi_{i}[{str(float(start)) + '_to_' + str(float(stop))}]" for i, (start, stop, color) in
                          enumerate(rois_ranges)]])
 
-    times = np.arange(0, rois_values.shape[1] * time_step, time_step)
+    times = np.linspace(0, rois_values.shape[1] * time_step, rois_values.shape[1])
 
     export_data = np.concatenate((np.array(filenames, dtype=object).reshape(1, -1),
                                   np.array(list(map(str, times)), dtype=object).reshape(1, -1),
