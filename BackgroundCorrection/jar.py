@@ -1,8 +1,9 @@
 import warnings
 
 import numpy as np
+from matplotlib import pyplot as plt
 
-from BackgroundCorrection.util import apply_limits
+from BackgroundCorrection.util import apply_limits, ground
 from BackgroundCorrection.reader import read, DataFile
 import BackgroundCorrection.algorithm as algorithm
 
@@ -55,15 +56,14 @@ def jar_correct(jar_file: DataFile, intensity: np.ndarray, lstsq=True, lstsq_shi
         scaling_factor, _, _, _ = np.linalg.lstsq(jar_ranged_corrected.reshape(-1, 1), data_ranged_corrected, rcond=None)
     else:
         # Linear scaling
-        scaling_factor = np.min(data_ranged_corrected / jar_ranged_corrected)
+        scaling_factor = np.min(intensity[jar_selection] / jar_intensity[jar_selection])
     jar_intensity_scaled = scaling_factor * jar_intensity
 
     intensity_jar_corrected = intensity - jar_intensity_scaled
 
-    jar_min = np.min(intensity_jar_corrected)
     shift = 0
-    if lstsq_shifted and jar_min < 0:
-        intensity_jar_corrected -= jar_min
-        shift = -jar_min
+    if lstsq_shifted:
+        shift = -np.min(intensity_jar_corrected)
+        intensity_jar_corrected = ground(intensity_jar_corrected, only_negative=True)
 
     return intensity_jar_corrected, jar_intensity_scaled, scaling_factor, shift

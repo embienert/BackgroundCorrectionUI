@@ -53,7 +53,11 @@ def normalize_max(y):
     return y / y_max
 
 
-def ground(y):
+def ground(y, only_negative=False):
     y_min = np.min(y)
 
+    if only_negative:
+        if y_min < 0:
+            return y - y_min
+        return y
     return y - y_min
