@@ -50,6 +50,11 @@ defaults = {
     },
     "jar": {
         "enable": False,
+        "method": {
+            "lstsq": True,
+            "lstsq_shifted": False,  # Same as lstsq, but shifts the result to guarantee non-negative values only
+            "linear": False,  # Uses biggest linear scaling factor that does not cause negative values
+        },
         "range_start": -(2 ** 32 - 1),
         "range_stop": 2 ** 32 - 1,
         "reference_file_head_row_count": 0,

@@ -12,6 +12,7 @@ class ProcessingResult:
         self.y_jar_corrected = np.array([])
         self.y_jar_scaled = np.array([])
         self.jar_scaling_factor = np.nan
+        self.jar_shift = np.nan
 
         self.y_background_corrected = np.array([])
         self.y_background_baseline = np.array([])
@@ -35,13 +36,18 @@ def process_parallel(intensity, x_ranged, range_selection, jar_file, settings, b
     # Apply jar-correction to intensity
     intensity_pre_bkg = intensity_ranged
     if settings["jar"]["enable"]:
-        intensity_jar_corrected, jar_intensity_scaled, jar_scaling_factor = jar.jar_correct(jar_file,
-                                                                                            intensity_ranged,
-                                                                                            **bkg_params)
+        (intensity_jar_corrected,
+         jar_intensity_scaled,
+         jar_scaling_factor,
+         jar_shift) = jar.jar_correct(jar_file,
+                                      intensity_ranged,
+                                      **settings["jar"]["method"],
+                                      **bkg_params)
 
         result.y_jar_corrected = intensity_jar_corrected
         result.y_jar_scaled = jar_intensity_scaled
         result.jar_scaling_factor = jar_scaling_factor
+        result.jar_shift = jar_shift
 
         intensity_pre_bkg = intensity_jar_corrected
 
@@ -112,7 +118,8 @@ def process_parallel(intensity, x_ranged, range_selection, jar_file, settings, b
 
         if settings["baseline"]["plot"]["enable"] and settings["baseline"]["enable"]:
             intensity_ranged_plot = result.y_ranged if not settings["jar"]["enable"] else result.y_jar_corrected
-            intensity_original_label = "Intensity (Original)" if not settings["jar"]["enable"] else "Intensity (Jar-Corrected)"
+            intensity_original_label = "Intensity (Original)" if not settings["jar"][
+                "enable"] else "Intensity (Jar-Corrected)"
 
             if settings["baseline"]["plot"]["original"]:
                 plt.plot(x_ranged, intensity_ranged_plot, label=intensity_original_label)

@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 
 from BackgroundCorrection.util import apply_limits
@@ -27,7 +29,11 @@ def load_jar(filename: str, head_rows: int, jar_selection_range: Tuple[float, fl
     return jar_file
 
 
-def jar_correct(jar_file: DataFile, intensity: np.ndarray, **opt):
+def jar_correct(jar_file: DataFile, intensity: np.ndarray, lstsq=True, lstsq_shifted=False, linear=False, **opt):
+    if not lstsq and not lstsq_shifted and not linear:
+        warnings.warn("No method set for JAR-correction. Using default `lstsq`.")
+        lstsq = True
+
     jar_intensity = jar_file.ys[0]
     jar_selection = jar_file.range_selection
 
@@ -45,7 +51,19 @@ def jar_correct(jar_file: DataFile, intensity: np.ndarray, **opt):
     data_corrected, data_baseline = algorithm.correct(intensity, **opt)
     data_ranged_corrected = data_corrected[jar_selection]
 
-    scaling_factor, _, _, _ = np.linalg.lstsq(jar_ranged_corrected.reshape(-1, 1), data_ranged_corrected, rcond=None)
+    if lstsq or lstsq_shifted:
+        scaling_factor, _, _, _ = np.linalg.lstsq(jar_ranged_corrected.reshape(-1, 1), data_ranged_corrected, rcond=None)
+    else:
+        # Linear scaling
+        scaling_factor = np.min(data_ranged_corrected / jar_ranged_corrected)
     jar_intensity_scaled = scaling_factor * jar_intensity
 
-    return intensity - jar_intensity_scaled, jar_intensity_scaled, scaling_factor
+    intensity_jar_corrected = intensity - jar_intensity_scaled
+
+    jar_min = np.min(intensity_jar_corrected)
+    shift = 0
+    if lstsq_shifted and jar_min < 0:
+        intensity_jar_corrected -= jar_min
+        shift = -jar_min
+
+    return intensity_jar_corrected, jar_intensity_scaled, scaling_factor, shift

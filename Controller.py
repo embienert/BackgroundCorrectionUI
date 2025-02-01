@@ -1,4 +1,4 @@
-__version__ = "0.7.2 alpha"
+__version__ = "0.8.0 alpha"
 
 from multiprocessing import Pool, cpu_count
 from tkinter.filedialog import askopenfilenames, askopenfilename, askdirectory
@@ -24,6 +24,7 @@ from settings import load_settings
 from tqdm import tqdm as loading_bar
 
 import warnings
+
 warnings.filterwarnings("ignore")
 
 try:
@@ -90,6 +91,7 @@ class ProcessingResult:
         self.y_jar_corrected = np.array([])
         self.y_jar_scaled = np.array([])
         self.jar_scaling_factor = np.nan
+        self.jar_shift = np.nan
 
         self.y_background_corrected = np.array([])
         self.y_background_baseline = np.array([])
@@ -158,13 +160,13 @@ class Controller:
 
     def extend_headers(self, dataset: DataSet):
         general_row = {k: v for k, v in {
-                "script_version": f"\"{__version__}\"",
-                "first_file": f"\"{dataset.files[0].basename}\"" if len(dataset.files) > 1 else None,
-                "last_file": f"\"{dataset.files[-1].basename}\"" if len(dataset.files) > 1 else None,
-                "file": f"\"{dataset.files[0].basename}\"" if len(dataset.files) == 1 else None,
-                "jar_file": f"\"{dataset.jar_file.basename}\"" if dataset.jar_file else None
-            }.items() if v is not None
-        }
+            "script_version": f"\"{__version__}\"",
+            "first_file": f"\"{dataset.files[0].basename}\"" if len(dataset.files) > 1 else None,
+            "last_file": f"\"{dataset.files[-1].basename}\"" if len(dataset.files) > 1 else None,
+            "file": f"\"{dataset.files[0].basename}\"" if len(dataset.files) == 1 else None,
+            "jar_file": f"\"{dataset.jar_file.basename}\"" if dataset.jar_file else None
+        }.items() if v is not None
+                       }
         baseline_row = {
             "baseline_algorithm": f"\"{algorithm.algorithm_by_index(self.settings.baseline.algorithm).__name__}\"",
             "baseline_itermax": self.settings.baseline.itermax,
@@ -200,14 +202,12 @@ class Controller:
                       roi_row.items()) if self.settings.io.header.roi_params and self.settings.rois.enable else None,
             ", ".join(f"{key}={value}" for key, value in
                       normalization_row.items()) if self.settings.io.header.normalization else None,
-            ", ".join(settings.option_to_str(self.settings, key) for key in self.settings.io.header.additional) if len(self.settings.io.header.additional) > 0 else None
+            ", ".join(settings.option_to_str(self.settings, key) for key in self.settings.io.header.additional) if len(
+                self.settings.io.header.additional) > 0 else None
         ]))
-
 
         for file in self.files:
             file.extend_head(header_extension)
-
-
 
     def process(self, intensity, dataset, jar_file=None):
         result = ProcessingResult()
@@ -219,13 +219,18 @@ class Controller:
         # Apply jar-correction to intensity
         intensity_pre_bkg = intensity_ranged
         if self.settings.jar.enable:
-            intensity_jar_corrected, jar_intensity_scaled, jar_scaling_factor = jar.jar_correct(jar_file,
-                                                                                                intensity_ranged,
-                                                                                                **self.bkg_params)
+            (intensity_jar_corrected,
+             jar_intensity_scaled,
+             jar_scaling_factor,
+             jar_shift) = jar.jar_correct(jar_file,
+                                          intensity_ranged,
+                                          **self.settings.jar.method,
+                                          **self.bkg_params)
 
             result.y_jar_corrected = intensity_jar_corrected
             result.y_jar_scaled = jar_intensity_scaled
             result.jar_scaling_factor = jar_scaling_factor
+            result.jar_shift = jar_shift
 
             intensity_pre_bkg = intensity_jar_corrected
 
@@ -296,12 +301,14 @@ class Controller:
                     else:
                         trouble_indices_ranges_str.append(str(start) + " to " + str(stop))
 
-                print(f"Found mismatching x-Axis values in file {os.path.basename(dataset.files[index+1].filename)} at indices\n\t"
-                      f"{','.join(trouble_indices_ranges_str)}")
-                failed_positions.extend(list(zip([index+1 for _ in range(len(trouble_indices_ranges))], trouble_indices_ranges)))
+                print(
+                    f"Found mismatching x-Axis values in file {os.path.basename(dataset.files[index + 1].filename)} at indices\n\t"
+                    f"{','.join(trouble_indices_ranges_str)}")
+                failed_positions.extend(
+                    list(zip([index + 1 for _ in range(len(trouble_indices_ranges))], trouble_indices_ranges)))
 
-            raise AssertionError(f"x-Axis value mismatch detected in {len(failed_positions)} file(s). Observe program output for exact position.")
-
+            raise AssertionError(
+                f"x-Axis value mismatch detected in {len(failed_positions)} file(s). Observe program output for exact position.")
 
         # Convert x-Axis between units and apply limits specified in settings
         x_unit_applied = np.vectorize(convert_x, otypes=[float])(dataset.files[0].x, self.settings.data.unit_in,
@@ -326,7 +333,6 @@ class Controller:
 
             print(f"Loaded jar file: {jar_file.file()}")
 
-
         dataset_labels = []
         ys = []
         for file in dataset.files:
@@ -335,7 +341,7 @@ class Controller:
             ys = np.vstack([file.ys for file in dataset.files])
 
         if self.settings.parallel.enable:
-            nr_cores = int(self.settings.parallel.cores) if self.settings.parallel.cores != "auto" else cpu_count()-1
+            nr_cores = int(self.settings.parallel.cores) if self.settings.parallel.cores != "auto" else cpu_count() - 1
 
             print("Processing data...")
 
@@ -453,7 +459,8 @@ class Controller:
             y_scale = np.arange(0, dataset.ys_result.shape[0] * self.settings.plot.time_step,
                                 self.settings.plot.time_step)[:dataset.ys_result.shape[0]]
 
-            time_range_selection = (self.settings.plot.display_time_range_start <= y_scale) & (y_scale <= self.settings.plot.display_time_range_stop)
+            time_range_selection = (self.settings.plot.display_time_range_start <= y_scale) & (
+                        y_scale <= self.settings.plot.display_time_range_stop)
             y_scale = y_scale[time_range_selection]
 
             print(dataset.x_result.shape, y_scale.shape)
@@ -500,7 +507,8 @@ class Controller:
             # Get ROI integration data on whole DataSet intensity
             select_max = self.settings.rois.selection.max
             dataset.roi_values = np.array(
-                [[get_area(dataset.x_result, y_result, range_min, range_max, flip=flip_roi, select_max=select_max) for y_result in
+                [[get_area(dataset.x_result, y_result, range_min, range_max, flip=flip_roi, select_max=select_max) for
+                  y_result in
                   dataset.ys_result]
                  for (range_min, range_max, _) in self.settings.rois.ranges]
             )
