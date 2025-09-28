@@ -74,4 +74,4 @@ def jar_correct(jar_file: DataFile, intensity: np.ndarray,
         shift = -np.min(intensity_jar_corrected)
         intensity_jar_corrected = ground(intensity_jar_corrected, only_negative=True)
 
-    return intensity_jar_corrected, jar_intensity_scaled, scaling_factor, shift
+    return intensity_jar_corrected, jar_intensity_scaled, scaling_factor, shift, data_corrected, data_baseline

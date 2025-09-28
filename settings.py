@@ -10,6 +10,8 @@ defaults = {
     },
     "io": {
         "out_dir": "bkgcorr",
+        "debug": True,
+        "debug_dir": "debug",
         "dat_file_sep": '\t',
         "head_row_count": 0,
         "header": {

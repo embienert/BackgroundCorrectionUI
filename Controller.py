@@ -18,7 +18,7 @@ from BackgroundCorrection.roi_integration import get_area, export_rois
 from BackgroundCorrection import roi_integration
 from BackgroundCorrection.units import convert_x, unit_x_str
 from BackgroundCorrection.util import apply_limits, normalize_area, normalize_max, ground, normalize_sum, ranges, \
-    dictify
+    dictify, DDict
 from settings import load_settings
 
 from tqdm import tqdm as loading_bar
@@ -80,6 +80,100 @@ class DataSet:
 
         jar_export_file.write_dat(out_dir, sep)
 
+    @staticmethod
+    def values_or_nan(value, size):
+        if isinstance(value, np.ndarray) and value.shape == size:
+            return value
+        elif value:
+            return value
+
+        output = np.empty(size)
+        output[:] = np.nan
+
+        return output
+
+    def export_debug_all(self, results, out_dir, sep, config: "DDict"):
+        for index, result in enumerate(results):
+            filename = f"debug_{self.dataset_name}_{index}.dat"
+            self.export_debug(result, out_dir, filename, sep, config)
+
+    def export_debug(self, result: "ProcessingResult", out_dir, filename, sep: str, config: "DDict"):
+        export_file = reader.DataFile(filename=filename, content=np.array([]), head=[
+            f"Debug output",
+            f"Input Dataset: {self.dataset_name}",
+            f"Input subset: {filename}",
+            f"Jar Reference: {self.jar_file.filename if self.jar_file else ''}",
+            f"Jar Scaling Factor: {result.jar_scaling_factor}",
+            f"Jar Shift: {result.jar_shift}",
+            *config.prettify().split("\n"),
+            sep.join([
+                "x",
+                "probe_intensity",
+                "jar_intensity",
+                "jar_selection",
+                "jar_bkgc",
+                "jar_bkg_baseline",
+                "jar_probe_bkgc",
+                "jar_probe_bkg_baseline",
+                "probe_bkgc",
+                "probe_bkg_baseline",
+                "probe_grounded",
+                "probe_normalized"
+            ])
+        ])
+
+        y_size = self.x_ranged.shape
+
+        jar_intensity = np.empty(y_size)
+        jar_intensity[:] = np.nan
+
+        jar_selection = np.empty(y_size)
+        jar_selection[:] = np.nan
+
+        jar_bkg = np.empty(y_size)
+        jar_bkg[:] = np.nan
+
+        jar_bkg_baseline = np.empty(y_size)
+        jar_bkg_baseline[:] = np.nan
+
+        jar_probe_bkg = np.empty(y_size)
+        jar_probe_bkg[:] = np.nan
+
+        jar_probe_bkg_baseline = np.empty(y_size)
+        jar_probe_bkg_baseline[:] = np.nan
+
+        if self.jar_file is not None and config.jar.enable:
+            jar_selection_range = self.jar_file.range_selection
+
+            jar_intensity = self.jar_file.ys[0]
+            jar_selection[jar_selection_range] = self.jar_file.ys_ranged[0]
+
+            if self.jar_file.ys_background_corrected.size != 0:
+                jar_bkg[jar_selection_range] = self.jar_file.ys_background_corrected[0]
+                jar_bkg_baseline[jar_selection_range] = self.jar_file.ys_background_baseline[0]
+            jar_probe_bkg[jar_selection_range] = result.jar_probe_corrected[jar_selection_range]
+            jar_probe_bkg_baseline[jar_selection_range] = result.jar_probe_baseline[jar_selection_range]
+
+        export_file.x_result = self.x_result
+        export_file.ys_result = np.array([
+            self.values_or_nan(result.y_ranged, y_size),
+            jar_intensity,
+            jar_selection,
+            jar_bkg,
+            jar_bkg_baseline,
+            jar_probe_bkg,
+            jar_probe_bkg_baseline,
+            self.values_or_nan(result.y_background_corrected, y_size),
+            self.values_or_nan(result.y_background_baseline, y_size),
+            self.values_or_nan(result.y_grounded, y_size),
+            self.values_or_nan(result.y_normalized, y_size)
+        ])
+
+        if not os.path.exists(out_dir):
+            os.mkdir(out_dir)
+
+        export_file.write_dat(out_dir, sep)
+
     def base_dir(self):
         return os.path.dirname(os.path.abspath(self.files[0].filename))
 
@@ -92,6 +186,8 @@ class ProcessingResult:
         self.y_jar_scaled = np.array([])
         self.jar_scaling_factor = np.nan
         self.jar_shift = np.nan
+        self.jar_probe_corrected = np.array([])
+        self.jar_probe_baseline = np.array([])
 
         self.y_background_corrected = np.array([])
         self.y_background_baseline = np.array([])
@@ -209,7 +305,7 @@ class Controller:
         for file in self.files:
             file.extend_head(header_extension)
 
-    def process(self, intensity, dataset, jar_file=None):
+    def process(self, intensity, dataset: DataSet, jar_file=None):
         result = ProcessingResult()
 
         # Apply x-limits to intensity values
@@ -222,7 +318,9 @@ class Controller:
             (intensity_jar_corrected,
              jar_intensity_scaled,
              jar_scaling_factor,
-             jar_shift) = jar.jar_correct(jar_file,
+             jar_shift,
+             jar_probe_corrected,
+             jar_probe_baseline) = jar.jar_correct(jar_file,
                                           intensity_ranged,
                                           **self.settings.jar.method,
                                           **self.bkg_params)
@@ -231,8 +329,11 @@ class Controller:
             result.y_jar_scaled = jar_intensity_scaled
             result.jar_scaling_factor = jar_scaling_factor
             result.jar_shift = jar_shift
+            result.jar_probe_corrected = jar_probe_baseline
+            result.jar_probe_baseline = jar_probe_baseline
 
             intensity_pre_bkg = intensity_jar_corrected
+
 
         # Perform background correction on prepared intensity data
         intensity_pre_ground = intensity_pre_bkg
@@ -445,6 +546,11 @@ class Controller:
         if self.settings.jar.enable:
             jar_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.jar.out_dir)
             dataset.export_jar(jar_out_dir, sep=self.settings.io.dat_file_sep)
+
+        # Debug output
+        if self.settings.io.debug:
+            debug_dir = os.path.join(base_dir, self.settings.io.debug_dir)
+            dataset.export_debug_all(results, debug_dir, sep=self.settings.io.dat_file_sep, config=self.settings)
 
         # Plotting
         if self.settings.plot.enable or (self.settings.rois.enable and self.settings.rois.plot.enable):

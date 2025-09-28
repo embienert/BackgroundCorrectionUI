@@ -9,6 +9,21 @@ class DDict(dict):
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
 
+    @staticmethod
+    def prettify_tree(tree: dict, path: tuple = ()) -> str:
+        output = ""
+        for key, value in tree.items():
+            if isinstance(value, dict):
+                output += DDict.prettify_tree(value, path + (key, ))
+            else:
+                prefix = "".join([str(subpath.strip()) + "." for subpath in path if subpath.strip()])
+                output += f"{prefix}{key}: {value}\n"
+
+        return output
+
+    def prettify(self):
+        return self.prettify_tree(self)
+
 
 def dictify(d):
     cpy = {}
