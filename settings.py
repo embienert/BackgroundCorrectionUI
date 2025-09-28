@@ -54,6 +54,7 @@ defaults = {
             "lstsq": True,
             "lstsq_shifted": False,  # Same as lstsq, but shifts the result to guarantee non-negative values only
             "linear": False,  # Uses biggest linear scaling factor that does not cause negative values
+            "use_bkg": False  # Calculate jar scaling based on background-corrected probe and jar intensities
         },
         "range_start": -(2 ** 32 - 1),
         "range_stop": 2 ** 32 - 1,

@@ -30,7 +30,8 @@ def load_jar(filename: str, head_rows: int, jar_selection_range: Tuple[float, fl
     return jar_file
 
 
-def jar_correct(jar_file: DataFile, intensity: np.ndarray, lstsq=True, lstsq_shifted=False, linear=False, **opt):
+def jar_correct(jar_file: DataFile, intensity: np.ndarray,
+                lstsq=True, lstsq_shifted=False, linear=False, use_bkg=False, **opt):
     if not lstsq and not lstsq_shifted and not linear:
         warnings.warn("No method set for JAR-correction. Using default `lstsq`.")
         lstsq = True
@@ -52,11 +53,18 @@ def jar_correct(jar_file: DataFile, intensity: np.ndarray, lstsq=True, lstsq_shi
     data_corrected, data_baseline = algorithm.correct(intensity, **opt)
     data_ranged_corrected = data_corrected[jar_selection]
 
+    if use_bkg:
+        jar_reference = jar_ranged_corrected.reshape(-1, 1)
+        data_reference = data_ranged_corrected
+    else:
+        jar_reference = jar_intensity[jar_selection]
+        data_reference = intensity[jar_selection]
+
     if lstsq or lstsq_shifted:
-        scaling_factor, _, _, _ = np.linalg.lstsq(jar_ranged_corrected.reshape(-1, 1), data_ranged_corrected, rcond=None)
+        scaling_factor, _, _, _ = np.linalg.lstsq(jar_reference, data_reference, rcond=None)
     else:
         # Linear scaling
-        scaling_factor = np.min(intensity[jar_selection] / jar_intensity[jar_selection])
+        scaling_factor = np.min(data_reference / jar_reference)
     jar_intensity_scaled = scaling_factor * jar_intensity
 
     intensity_jar_corrected = intensity - jar_intensity_scaled
