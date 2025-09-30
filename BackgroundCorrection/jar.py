@@ -40,6 +40,7 @@ def jar_correct(jar_file: DataFile, intensity: np.ndarray,
     jar_selection = jar_file.range_selection
 
     jar_ranged_corrected = jar_file.ys_background_corrected
+    jar_ranged_baseline = jar_file.ys_background_baseline
 
     if jar_ranged_corrected.size == 0:
         jar_corrected, jar_baseline = algorithm.correct(jar_file.ys[0], **opt)
@@ -54,17 +55,17 @@ def jar_correct(jar_file: DataFile, intensity: np.ndarray,
     data_ranged_corrected = data_corrected[jar_selection]
 
     if use_bkg:
-        jar_reference = jar_ranged_corrected.reshape(-1, 1)
+        jar_reference = jar_ranged_corrected
         data_reference = data_ranged_corrected
     else:
         jar_reference = jar_intensity[jar_selection]
         data_reference = intensity[jar_selection]
 
     if lstsq or lstsq_shifted:
-        scaling_factor, _, _, _ = np.linalg.lstsq(jar_reference, data_reference, rcond=None)
+        scaling_factor, _, _, _ = np.linalg.lstsq(np.array([jar_reference]), data_reference, rcond=None)
     else:
         # Linear scaling
-        scaling_factor = np.min(data_reference / jar_reference)
+        scaling_factor = np.min(data_reference / jar_reference.reshape(-1, 1))
     jar_intensity_scaled = scaling_factor * jar_intensity
 
     intensity_jar_corrected = intensity - jar_intensity_scaled
