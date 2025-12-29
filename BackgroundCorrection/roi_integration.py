@@ -83,7 +83,7 @@ def export_rois(rois_values, filenames, rois_ranges, out_dir, name: str = "", ti
                                   rois_values)).T
 
     if not os.path.exists(out_dir):
-        os.mkdir(out_dir)
+        os.makedirs(out_dir, exist_ok=True)
 
     np.savetxt(os.path.join(out_dir, name + "_rois.csv"), export_data, delimiter=",", fmt="%s", header=header,
                comments="")

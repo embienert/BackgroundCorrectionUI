@@ -64,7 +64,7 @@ class DataSet:
         baseline_export_file.ys_result = self.ys_result
 
         if not os.path.exists(out_dir):
-            os.mkdir(out_dir)
+            os.makedirs(out_dir, exist_ok=True)
 
         baseline_export_file.write_dat(out_dir, sep)
 
@@ -76,7 +76,7 @@ class DataSet:
         jar_export_file.ys_result = self.ys_jar
 
         if not os.path.exists(out_dir):
-            os.mkdir(out_dir)
+            os.makedirs(out_dir, exist_ok=True)
 
         jar_export_file.write_dat(out_dir, sep)
 
@@ -170,7 +170,7 @@ class DataSet:
         ])
 
         if not os.path.exists(out_dir):
-            os.mkdir(out_dir)
+            os.makedirs(out_dir, exist_ok=True)
 
         export_file.write_dat(out_dir, sep)
 
@@ -534,7 +534,7 @@ class Controller:
         baseline_out_dir = os.path.join(base_dir, self.settings.io.out_dir, self.settings.baseline.out_dir)
 
         if not os.path.exists(baseline_out_dir):
-            os.mkdir(baseline_out_dir)
+            os.makedirs(baseline_out_dir, exist_ok=True)
 
         self.extend_headers(dataset)
 
