@@ -64,7 +64,13 @@ def jar_correct(jar_file: DataFile, intensity: np.ndarray,
         scaling_factor, _, _, _ = np.linalg.lstsq(jar_reference, data_reference, rcond=None)
     else:
         # Linear scaling
-        scaling_factor = np.min(data_reference / jar_reference)
+        data_jar_ratio = data_reference.reshape(-1, 1) / jar_reference.reshape(-1, 1)
+        data_jar_ratio_positives = data_jar_ratio[data_jar_ratio > 0]
+
+        if data_jar_ratio_positives.any():
+            scaling_factor = np.min(data_jar_ratio_positives)
+        else:
+            scaling_factor = np.max(data_jar_ratio)
     jar_intensity_scaled = scaling_factor * jar_intensity
 
     intensity_jar_corrected = intensity - jar_intensity_scaled
