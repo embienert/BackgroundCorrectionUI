@@ -84,7 +84,7 @@ class DataSet:
     def values_or_nan(value, size):
         if isinstance(value, np.ndarray) and value.shape == size:
             return value
-        elif value:
+        elif not isinstance(value, np.ndarray) and value:
             return value
 
         output = np.empty(size)
