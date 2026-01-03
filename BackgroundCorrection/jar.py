@@ -1,7 +1,7 @@
 import warnings
 
 import numpy as np
-from matplotlib import pyplot as plt
+from scipy.optimize import minimize
 
 from BackgroundCorrection.util import apply_limits, ground
 from BackgroundCorrection.reader import read, DataFile
@@ -30,11 +30,28 @@ def load_jar(filename: str, head_rows: int, jar_selection_range: Tuple[float, fl
     return jar_file
 
 
+def cl_objective(params, y_fit, y_ref):
+    scalar, offset = params
+
+    diff = scalar * y_fit + offset - y_ref
+
+    return np.sum(diff ** 2)
+
+
+def cl_constraint(params, y_fit, y_ref):
+    scalar, offset = params
+
+    return y_ref - (scalar * y_fit + offset)
+
+
+CL_BOUNDS = [(0, None), (None, None)]
+
+
 def jar_correct(jar_file: DataFile, intensity: np.ndarray,
-                lstsq=True, lstsq_shifted=False, linear=False, use_bkg=False, **opt):
-    if not lstsq and not lstsq_shifted and not linear:
-        warnings.warn("No method set for JAR-correction. Using default `lstsq`.")
-        lstsq = True
+                lstsq=True, lstsq_shifted=False, linear=False, advanced=False, use_bkg=False, **opt):
+    if not lstsq and not lstsq_shifted and not linear and not advanced:
+        warnings.warn("No method set for JAR-correction. Using default `advanced`.")
+        advanced = True
 
     jar_intensity = jar_file.ys[0]
     jar_selection = jar_file.range_selection
@@ -62,7 +79,38 @@ def jar_correct(jar_file: DataFile, intensity: np.ndarray,
         data_reference = intensity[jar_selection]
 
     if lstsq or lstsq_shifted:
-        scaling_factor, _, _, _ = np.linalg.lstsq(np.array([jar_reference]), data_reference, rcond=None)
+        scaling_factor, _, _, _ = np.linalg.lstsq(jar_reference.reshape(-1, 1), data_reference, rcond=None)
+        offset = 0
+    elif advanced:
+        # Constrained linear scalar+offset solver
+        jar = jar_reference.reshape(-1,)
+
+        constraints = {
+            "type": "ineq",
+            "fun": cl_constraint,
+            "args": (jar, data_reference)
+        }
+
+        initial = [1.0, np.min(data_reference - jar)]
+
+        result = minimize(
+            cl_objective,
+            x0=initial,
+            args=(jar, data_reference),
+            bounds=CL_BOUNDS,
+            constraints=constraints,
+            options={
+                "maxiter": 1_000,
+            },
+        )
+
+        scaling_factor, offset = result.x
+
+        # print(result.x)
+        # print(initial)
+        # print(result.nit)
+        # print(cl_objective(initial, jar, data_reference))
+        # print(result.fun)
     else:
         # Linear scaling
         data_jar_ratio = data_reference.reshape(-1, 1) / jar_reference.reshape(-1, 1)
@@ -72,13 +120,13 @@ def jar_correct(jar_file: DataFile, intensity: np.ndarray,
             scaling_factor = np.min(data_jar_ratio_positives)
         else:
             scaling_factor = np.max(data_jar_ratio)
-    jar_intensity_scaled = scaling_factor * jar_intensity
+        offset = 0
+    jar_intensity_scaled = scaling_factor * jar_intensity + offset
 
     intensity_jar_corrected = intensity - jar_intensity_scaled
 
-    shift = 0
     if lstsq_shifted:
-        shift = -np.min(intensity_jar_corrected)
+        offset = -np.min(intensity_jar_corrected)
         intensity_jar_corrected = ground(intensity_jar_corrected, only_negative=True)
 
-    return intensity_jar_corrected, jar_intensity_scaled, scaling_factor, shift, data_corrected, data_baseline
+    return intensity_jar_corrected, jar_intensity_scaled, scaling_factor, offset, data_corrected, data_baseline
