@@ -70,7 +70,7 @@ class DataSet:
 
     def export_jar(self, out_dir, sep):
         jar_export_file = reader.DataFile(filename=self.dataset_name + "_jar.dat", content=np.array([]), head=[
-            f"Jar-Corrected intensities with reference file {self.jar_file.filename}"])
+            f"Jar-Corrected intensities with reference file {self.jar_file.filename}"] + self.files[0].head)
 
         jar_export_file.x_result = self.x_result
         jar_export_file.ys_result = self.ys_jar
