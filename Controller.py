@@ -329,7 +329,7 @@ class Controller:
             result.y_jar_scaled = jar_intensity_scaled
             result.jar_scaling_factor = jar_scaling_factor
             result.jar_shift = jar_shift
-            result.jar_probe_corrected = jar_probe_baseline
+            result.jar_probe_corrected = jar_probe_corrected
             result.jar_probe_baseline = jar_probe_baseline
 
             intensity_pre_bkg = intensity_jar_corrected
