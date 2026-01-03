@@ -476,21 +476,21 @@ class Controller:
                 result = self.process(intensity, dataset, jar_file)
                 result.label = label
 
-                # Plot data for first sample in first file
+                # Plot data for selected sample in first file
                 if column_index in self.settings.baseline.plot.test_datasets:
                     if self.settings.jar.plot.enable and self.settings.jar.enable:
                         if self.settings.jar.plot.jar_original:
                             plt.plot(dataset.x_ranged, jar_file.ys[0], label="Jar Intensity (Original)")
                         if self.settings.jar.plot.jar_ranged:
                             plt.plot(jar_file.x_ranged, jar_file.ys_ranged[0], label="Jar Intensity (Ranged)")
-                        if self.settings.jar.plot.jar_baseline:
+                        if self.settings.jar.plot.jar_baseline and self.settings.jar.method.use_bkg:
                             plt.plot(jar_file.x_ranged, jar_file.ys_background_baseline[0],
                                      label="Jar Baseline (Ranged)")
-                        if self.settings.jar.plot.jar_corrected:
+                        if self.settings.jar.plot.jar_corrected and self.settings.jar.method.use_bkg:
                             plt.plot(jar_file.x_ranged, jar_file.ys_background_corrected[0],
                                      label="Jar Intensity (Corrected, Ranged)")
                         if self.settings.jar.plot.jar_scaled:
-                            plt.plot(dataset.x_ranged, result.y_jar_scaled, label="Jar Intensity (Corrected, Scaled)")
+                            plt.plot(dataset.x_ranged, result.y_jar_scaled, label="Jar Intensity (Scaled)")
                         if self.settings.jar.plot.intensity_original:
                             plt.plot(dataset.x_ranged, result.y_ranged, label="Intensity (Pre-Jar-Correction)")
                         if self.settings.jar.plot.intensity_corrected:
@@ -499,7 +499,7 @@ class Controller:
                         plt.xlabel("x")
                         plt.ylabel("intensity")
                         plt.legend(loc="upper right")
-                        plt.title(label + " (jar)")
+                        plt.title(label + f" (jar, scalar: {result.jar_scaling_factor}, offset: {result.jar_shift})")
 
                         plt.show()
 
@@ -568,8 +568,6 @@ class Controller:
             time_range_selection = (self.settings.plot.display_time_range_start <= y_scale) & (
                         y_scale <= self.settings.plot.display_time_range_stop)
             y_scale = y_scale[time_range_selection]
-
-            print(dataset.x_result.shape, y_scale.shape)
 
             extent = [np.min(dataset.x_result), np.max(dataset.x_result), np.min(y_scale), np.max(y_scale)]
 
