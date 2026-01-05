@@ -1,4 +1,4 @@
-__version__ = "0.9.2 alpha"
+__version__ = "1.10.1"
 
 from multiprocessing import Pool, cpu_count
 from tkinter.filedialog import askopenfilenames, askopenfilename, askdirectory
@@ -476,7 +476,7 @@ class Controller:
                 result = self.process(intensity, dataset, jar_file)
                 result.label = label
 
-                # Plot data for selected sample in first file
+                # Plot data for selected samples
                 if column_index in self.settings.baseline.plot.test_datasets:
                     if self.settings.jar.plot.enable and self.settings.jar.enable:
                         if self.settings.jar.plot.jar_original:
